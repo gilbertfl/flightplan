@@ -112,6 +112,14 @@ app.get('/api/search', async (req, res, next) => {
   }
 })
 
+app.get('/api/init', async (req, res, next) => {
+  // Open database
+  console.log('Init: Opening database...')
+  db.migrate()
+  db.open()
+  console.log('Init: finished opening database.')
+})
+
 const main = async () => {
   try {
     // Open database
