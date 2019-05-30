@@ -14,6 +14,7 @@ function db () {
 
 function open () {
   if (!_db) {
+    console.log(`Attempting to open database: ${paths.database}`)
     _db = new Database(paths.database)
   }
   return _db
