@@ -9,6 +9,7 @@
   "scripts": {
     "postinstall": "cd client && yarn",
     "client": "cd client && yarn start",
+    "clientprod": "cd client && yarn build && yarn global add serve && serve -s build",
     "server": "nodemon bin/cli-server.js",
     "dev": "concurrently --kill-others-on-fail -p \"[{name}]\" -n \"CLIENT,SERVER\" -c \"black.bgBlue.bold,black.bgGreen.bold\" \"yarn client\" \"yarn server\"",
     "test": "jest"
