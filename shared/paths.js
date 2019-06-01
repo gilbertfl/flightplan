@@ -1,6 +1,6 @@
 module.exports = {
-  credentials: 'config/accounts.txt',
-  oldCredentials: 'config/accounts.json',
-  database: 'db/database.sqlite3',
-  data: 'data'
+  credentials: 'app/config/accounts.txt',
+  oldCredentials: 'app/onfig/accounts.json',
+  database: 'app/db/database.sqlite3',
+  data: 'app/data'
 }
