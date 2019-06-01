@@ -9,10 +9,16 @@ var cors = require('cors')
 const app = express()
 const port = process.env.PORT || 5000
 
-app.use(cors())
-app.options('*', cors()) // include before other routes
+//app.use(cors())
+//app.options('*', cors()) // include before other routes
 
-app.get('/api/config', cors(), async (req, res, next) => {
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
+
+app.get('/api/config', async (req, res, next) => {
   try {
     // Insert each website engine
     const engines = fp.supported().map((id) => {
@@ -39,7 +45,7 @@ app.get('/api/config', cors(), async (req, res, next) => {
   }
 })
 
-app.get('/api/search', cors(), async (req, res, next) => {
+app.get('/api/search', async (req, res, next) => {
   try {
     const {
       fromCity = '',
