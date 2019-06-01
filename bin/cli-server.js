@@ -4,13 +4,13 @@ const fp = require('../src')
 const db = require('../shared/db')
 const logger = require('../shared/logger')
 const utils = require('../src/utils')
-var cors = require('cors')
+//var cors = require('cors')
 
 const app = express()
 const port = process.env.PORT || 5000
 
-app.use(cors())
-app.options('*', cors()) // include before other routes
+// app.use(cors())
+// app.options('*', cors()) // include before other routes
 
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
@@ -18,7 +18,7 @@ app.use(function(req, res, next) {
   next();
 });
 
-app.get('/api/config', cors(), async (req, res, next) => {
+app.get('/api/config', /*cors(),*/ async (req, res, next) => {
   try {
     // Insert each website engine
     const engines = fp.supported().map((id) => {
@@ -45,7 +45,7 @@ app.get('/api/config', cors(), async (req, res, next) => {
   }
 })
 
-app.get('/api/search', cors(), async (req, res, next) => {
+app.get('/api/search', /*cors(),*/ async (req, res, next) => {
   try {
     const {
       fromCity = '',
@@ -127,7 +127,7 @@ const main = async () => {
     // Open database
     console.log('Migrating database (if necessary)...')
     db.migrate()
-    console.log('Opening database!...')
+    console.log('Opening database...')
     db.open()
 
     // Launch Express server
