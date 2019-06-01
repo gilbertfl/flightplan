@@ -127,7 +127,7 @@ const main = async () => {
     // Open database
     console.log('Migrating database (if necessary)...')
     db.migrate()
-    console.log('Opening database...')
+    console.log('Opening database!...')
     db.open()
 
     // Launch Express server
