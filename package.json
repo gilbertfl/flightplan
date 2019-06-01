@@ -7,7 +7,6 @@
     "flightplan": "bin/cli.js"
   },
   "scripts": {
-    "postinstall": "cd client && yarn",
     "client": "cd client && yarn start",
     "clientprod": "cd client && yarn build && yarn global add serve && serve -s build",
     "server": "nodemon bin/cli-server.js",
