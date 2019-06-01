@@ -4,9 +4,12 @@ const fp = require('../src')
 const db = require('../shared/db')
 const logger = require('../shared/logger')
 const utils = require('../src/utils')
+var cors = require('cors')
 
 const app = express()
 const port = process.env.PORT || 5000
+
+app.use(cors())
 
 app.get('/api/config', async (req, res, next) => {
   try {
