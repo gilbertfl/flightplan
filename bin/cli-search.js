@@ -315,8 +315,8 @@ const main = async (args) => {
     }
 
     // Create database if necessary, and then open
-    db.migrate()
-    db.open()
+    //db.migrate()
+    await db.open()
 
     // Setup engine options
     const options = { headless, proxy, docker }

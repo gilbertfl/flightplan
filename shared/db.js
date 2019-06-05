@@ -1,130 +1,117 @@
-const Database = require('better-sqlite3')
+var Connection = require('tedious').Connection;
+var Request = require('tedious').Request;
+var ConnectionPool = require('tedious-connection-pool');
+
 const fs = require('fs')
 const path = require('path')
 const rimraf = require('rimraf')
-
+const util = require('util');
 const paths = require('./paths')
 const prompts = require('../shared/prompts')
 
-let _db = null
+//let _db = null
+let _pool = null
 
 function db () {
   return _db
 }
 
-function open () {
-  if (!_db) {
-    _db = new Database(paths.database)
-  }
-  return _db
-}
 
-function detectOldVersion () {
-  let db = null
-  try {
-    db = new Database(paths.database)
-    return !!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='awards_requests'`).get()
-  } finally {
-    if (db) {
-      db.close()
+// Create connection to database
+var connectionConfig =
+{
+    authentication: {
+        options: {
+            userName: paths.databaseUser,
+            password: paths.databasePassword
+        },
+        type: 'default'
+    },
+    server: paths.database, 
+    options:
+    {
+        database: paths.databaseName,
+        encrypt: true, 
+        rowCollectionOnRequestCompletion: true // <-- allows rows in request callback as per https://tediousjs.github.io/tedious/api-request.html
     }
+}
+var poolConfig = {
+  min: 2,
+  max: 4,
+  log: true
+};
+
+async function open () {
+  if (!_pool) {
+    console.log(`Attempting to open database pool: ${paths.database}`);
+
+
+    //create the pool
+    _pool = new ConnectionPool(poolConfig, connectionConfig);
+
+    pool.on('error', function(err) {
+        console.error(err);
+    });
+  
+    // _db = new Connection(config);
+    
+    // // wrap database event callbacks into a promise
+    // _db.on[util.promisify.custom] = (eventName) => {
+    //   return new Promise((resolve, reject) => {
+    //      _db.on(eventName, function(err) {
+    //        if (err) {
+    //          console.error(`error on ${eventName}`, err);
+    //          reject(err);
+    //        } else {
+    //          resolve();
+    //        }
+    //      });
+    //   });
+    // };
+    // const dbOnEventFunction = util.promisify(_db.on);
+
+    // // don't return until the db is connected (or until it's failed)
+    // await dbOnEventFunction('connect');
   }
+
+  return _db;
 }
 
-function migrate () {
-  if (fs.existsSync(paths.database)) {
-    let migrationNeeded = false
-    if (detectOldVersion()) {
-      if (prompts.askYesNo(`
-ERROR: An older version database was detected, that is incompatible with this version of Flightplan.
-
-Would you like to convert it to the newer format? (WARNING: All search and award data will be deleted!)`)) {
-        fs.unlinkSync(paths.database)
-        rimraf.sync(paths.data)
-        migrationNeeded = true
+// override promise generation so we can return *both* rowcount and rows
+function createPromiseFromRequest(db, sql, requestFunction) {
+  return new Promise((resolve, reject) => {
+    requestFunction(db, sql, function(err, rowCount, rows) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve({ rowCount, rows });
       }
-    }
-    if (!migrationNeeded) {
-      return
-    }
-  }
-  console.log('Creating database...')
-
-  // Create database directory if missing
-  const dir = path.dirname(paths.database)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir)
-  }
-
-  // Create the database, and tables
-  try {
-    _db = open()
-    createTable('requests', [
-      'id INTEGER PRIMARY KEY ASC',
-      'engine TEXT NOT NULL',
-      'partners BOOLEAN NOT NULL',
-      'fromCity TEXT NOT NULL',
-      'toCity TEXT NOT NULL',
-      'departDate TEXT NOT NULL',
-      'returnDate TEXT',
-      'cabin TEXT',
-      'quantity INTEGER DEFAULT 0',
-      'assets TEXT NOT NULL',
-      'updatedAt TEXT DEFAULT CURRENT_TIMESTAMP'
-    ])
-    createTable('awards', [
-      'id INTEGER PRIMARY KEY ASC',
-      'requestId INTEGER',
-      'engine TEXT NOT NULL',
-      'partner BOOLEAN NOT NULL',
-      'fromCity TEXT NOT NULL',
-      'toCity TEXT NOT NULL',
-      'date TEXT NOT NULL',
-      'cabin TEXT NOT NULL',
-      'mixed BOOLEAN NOT NULL',
-      'duration INTEGER',
-      'stops INTEGER DEFAULT 0',
-      'quantity INTEGER DEFAULT 1',
-      'mileage INTEGER',
-      'fees TEXT',
-      'fares TEXT',
-      'updated_at TEXT DEFAULT CURRENT_TIMESTAMP'
-    ])
-    createTable('segments', [
-      'id INTEGER PRIMARY KEY ASC',
-      'awardId INTEGER',
-      'position INTEGER NOT NULL',
-      'airline TEXT NOT NULL',
-      'flight TEXT NOT NULL',
-      'aircraft TEXT',
-      'fromCity TEXT NOT NULL',
-      'toCity TEXT NOT NULL',
-      'date TEXT NOT NULL',
-      'departure TEXT NOT NULL',
-      'arrival TEXT NOT NULL',
-      'duration INTEGER',
-      'nextConnection INTEGER',
-      'cabin TEXT',
-      'stops INTEGER DEFAULT 0',
-      'lagDays INTEGER DEFAULT 0',
-      'bookingCode TEXT',
-      'updated_at TEXT DEFAULT CURRENT_TIMESTAMP'
-    ])
-  } catch (err) {
-    throw new Error(`Database migration failed: ${err.message}`)
-  }
+    });
+  });
 }
 
-function createTable (tableName, columns) {
-  return _db.prepare(`CREATE TABLE ${tableName} (${columns.join(',')})`).run()
-}
-
-function insertRow (table, row) {
+async function insertRow (table, row) {
   const entries = Object.entries(row)
   const colNames = entries.map(x => x[0])
   const colVals = entries.map(x => coerceType(x[1]))
-  const sql = `INSERT INTO ${table} (${colNames.join(',')}) VALUES (${colVals.map(x => '?').join(',')})`
-  return _db.prepare(sql).run(...colVals)
+  
+  //const sql = `INSERT INTO ${table} (${colNames.join(',')}) VALUES (${colVals.map(x => '?').join(',')})`
+  const sql = `INSERT ${table} (${colNames.join(',')}) OUTPUT INSERTED.id VALUES (${colVals.map(x => '?').join(',')});`
+
+  var oneWayFn = function (db, sql, requestCallback) {
+    var request = new Request(sql, requestCallback);  
+    request.addParameter('engine', TYPES.NVarChar, engine);
+    request.addParameter('cabin', TYPES.NVarChar, cabin);
+    request.addParameter('quantity', TYPES.NVarChar, quantity);
+    request.addParameter('fromCity', TYPES.NVarChar, fromCity);
+    request.addParameter('toCity', TYPES.NVarChar, toCity);
+    request.addParameter('departStr', TYPES.NVarChar, departStr);
+    db.execSql(request); 
+  };
+  oneWayFn[util.promisify.custom] = (innerdb, innersql) => createPromiseFromRequest(innerdb, innersql, oneWayFn);
+  const oneWayPromise = util.promisify(oneWayFn);
+  var result = await oneWayPromise(_db, sql);
+  return result.rows;
 }
 
 function coerceType (val) {
@@ -135,7 +122,16 @@ function coerceType (val) {
 }
 
 function count (table) {
-  const result = _db.prepare(`SELECT count(*) FROM ${table}`).get()
+  const sql = `SELECT count(*) FROM ${table}`;
+  
+  //const result = _db.prepare(sql).get()
+  var request = new Request(sql, function(err, rowCount, rows) {  
+    if (err) {  
+      console.error(err);
+    }  
+  });
+  _db.execSql(request);
+
   return result ? result['count(*)'] : undefined
 }
 
@@ -147,27 +143,41 @@ function close () {
 }
 
 function begin () {
-  _db.prepare('BEGIN').run()
+  //_db.prepare('BEGIN').run()
+  _db.beginTransaction(err => {
+    if (err) {
+      console.error('begin transaction error', err)
+    }
+  });
 }
 
 function commit () {
-  _db.prepare('COMMIT').run()
+  //_db.prepare('COMMIT').run()
+  _db.commitTransaction(err => {
+    if (err) {
+      console.error('commit transaction error', err)
+    }
+  });
 }
 
 function rollback () {
-  _db.prepare('ROLLBACK').run()
+  //_db.prepare('ROLLBACK').run()
+  _db.rollbackTransaction(err => {
+    if (err) {
+      console.error('rollback transaction error', err)
+    }
+  });
 }
 
 module.exports = {
-  db,
+//  db,
   open,
-  migrate,
-  createTable,
   insertRow,
   coerceType,
   count,
   close,
   begin,
   commit,
-  rollback
+  rollback, 
+  createPromiseFromRequest
 }

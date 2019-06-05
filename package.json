@@ -7,20 +7,22 @@
     "flightplan": "bin/cli.js"
   },
   "scripts": {
-    "postinstall": "cd client && yarn",
     "client": "cd client && yarn start",
+    "clientprod": "cd client && yarn build && yarn global add serve && serve -s build",
     "server": "nodemon bin/cli-server.js",
     "dev": "concurrently --kill-others-on-fail -p \"[{name}]\" -n \"CLIENT,SERVER\" -c \"black.bgBlue.bold,black.bgGreen.bold\" \"yarn client\" \"yarn server\"",
     "test": "jest"
   },
-  "repository": "https://github.com/flightplan-tool/flightplan",
+  "repository": "https://github.com/p2bauer/flightplan",
   "author": "JD",
   "license": "MIT",
   "private": false,
   "dependencies": {
     "address": "^1.0.3",
     "await-sleep": "^0.0.1",
-    "better-sqlite3": "^4.1.4",
+    "tedious": "^5.0.3",
+    "tedious-connection-pool": "^1.0.5", 
+    "async": "^2.6.2",
     "chalk": "^2.4.1",
     "cheerio": "^1.0.0-rc.2",
     "commander": "github:jd20/commander.js#master",
@@ -41,6 +43,6 @@
     "concurrently": "^3.5.1",
     "jest": "^23.6.0",
     "jest-cli": "^23.6.0",
-    "nodemon": "^1.17.3"
+    "nodemon": "^1.19.1"
   }
 }

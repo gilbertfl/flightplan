@@ -91,7 +91,7 @@ function loadRequest (row) {
   })
 }
 
-function saveRequest (results) {
+async function saveRequest (results) {
   // Get assets (only needs to have paths)
   const { assets } = results.trimContents()
 
@@ -110,10 +110,10 @@ function saveRequest (results) {
   }
 
   // Insert the row
-  return db.insertRow('requests', row).lastInsertROWID
+  return await db.insertRow('requests', row).lastInsertROWID
 }
 
-function saveAwards (requestId, awards, placeholders) {
+async function saveAwards (requestId, awards, placeholders) {
   const ids = []
 
   // Transform objects to rows
@@ -147,7 +147,7 @@ function saveAwards (requestId, awards, placeholders) {
 
       // Save the individual award and get it's ID
       row.requestId = requestId
-      const awardId = db.insertRow('awards', row).lastInsertROWID
+      const awardId = await db.insertRow('awards', row).lastInsertROWID
       ids.push(awardId)
 
       // Now add each segment
@@ -164,7 +164,7 @@ function saveAwards (requestId, awards, placeholders) {
   return success ? ids : null
 }
 
-function saveSegment (awardId, position, segment) {
+async function saveSegment (awardId, position, segment) {
   // Build the row data
   const row = {
     airline: segment.airline,
@@ -185,7 +185,7 @@ function saveSegment (awardId, position, segment) {
   row.position = position
 
   // Save the individual award and get it's ID
-  return db.insertRow('segments', row).lastInsertROWID
+  return await db.insertRow('segments', row).lastInsertROWID
 }
 
 module.exports = {
