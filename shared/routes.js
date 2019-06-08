@@ -60,35 +60,30 @@ async function find (route) {
 
 async function requests (route) {
 
-  console.log(route)
+  console.log(route);
 
   // If no route defined, just select all records
   if (!route) {
-    return db.getAllRequests();
+    return await db.getAllRequests();
   }
 
   const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
 
   // Select only the relevant segments
   if (returnDate) {
-    return db.getRequestsForRT(route);
+    return await db.getRequestsForRT(route);
   } else {
-    return db.getRequestsForOW(route);
+    return await db.getRequestsForOW(route);
   }
 }
 
 async function awards (route) {
+
+  console.log(route);
+
   // If no route defined, just select all records
   if (!route) {
-    var getAllAwardsFn = function (db, sql, requestCallback) {
-      var request = new Request(sql, requestCallback);
-      db.execSql(request);
-    };
-    getAllAwardsFn[util.promisify.custom] = (innerdb, innersql) => db.createPromiseFromRequest(innerdb, innersql, getAllAwardsFn);
-    const getAllAwardsPromise = util.promisify(getAllAwardsFn);
-    var allAwardsResult = await getAllAwardsPromise(database, 'SELECT * FROM awards');
-    console.log("all awards result", allAwardsResult);
-    return allAwardsResult.rows;
+    return await db.getAllAwards();
   }
 
   // Format dates
@@ -99,44 +94,10 @@ async function awards (route) {
   // Select only the relevant segments
   if (returnDate) {
     // Round-Trip route
-    const sql = 'SELECT * FROM awards WHERE ' +
-        'engine = @engine AND cabin = @cabin AND quantity <= @quantity AND (' +
-        '(fromCity = @fromCity AND toCity = @toCity AND date = @departStr) OR ' +
-        '(fromCity = @toCity AND toCity = @fromCity AND date = @returnStr))'
-    var roundTripFn = function (db, sql, requestCallback) {
-      var request = new Request(sql, requestCallback);  
-      request.addParameter('engine', TYPES.VarChar, engine);
-      request.addParameter('cabin', TYPES.VarChar, cabin);
-      request.addParameter('quantity', TYPES.Int, quantity);
-      request.addParameter('fromCity', TYPES.VarChar, fromCity);
-      request.addParameter('toCity', TYPES.VarChar, toCity);
-      request.addParameter('departStr', TYPES.VarChar, departStr);
-      request.addParameter('returnStr', TYPES.VarChar, returnStr);
-      db.execSql(request); 
-    };
-    roundTripFn[util.promisify.custom] = (innerdb, innersql) => db.createPromiseFromRequest(innerdb, innersql, roundTripFn);
-    const roundTripPromise = util.promisify(roundTripFn);
-    var result = await roundTripPromise(database, sql);
-    return result.rows;
+    return await db.getAwardsForRT(route);
   } else {
     // One-Way route
-    const sql = 'SELECT * FROM awards WHERE ' +
-        'engine = @engine AND cabin = @cabin AND quantity <= @quantity AND ' +
-        'fromCity = @fromCity AND toCity = @toCity AND date = @departStr'
-    var oneWayFn = function (db, sql, requestCallback) {
-      var request = new Request(sql, requestCallback);  
-      request.addParameter('engine', TYPES.NVarChar, engine);
-      request.addParameter('cabin', TYPES.NVarChar, cabin);
-      request.addParameter('quantity', TYPES.NVarChar, quantity);
-      request.addParameter('fromCity', TYPES.NVarChar, fromCity);
-      request.addParameter('toCity', TYPES.NVarChar, toCity);
-      request.addParameter('departStr', TYPES.NVarChar, departStr);
-      db.execSql(request); 
-    };
-    oneWayFn[util.promisify.custom] = (innerdb, innersql) => db.createPromiseFromRequest(innerdb, innersql, oneWayFn);
-    const oneWayPromise = util.promisify(oneWayFn);
-    var result = await oneWayPromise(database, sql);
-    return result.rows;
+    return await db.getAwardsForOW(route);
   }
 }
 

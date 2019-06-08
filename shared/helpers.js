@@ -54,7 +54,8 @@ function cleanupRequest (request) {
   }
 
   // Remove from the database
-  db.db().prepare('DELETE FROM requests WHERE id = ?').run(request.id)
+  //db.db().prepare('DELETE FROM requests WHERE id = ?').run(request.id)
+  db.cleanupRequest(request.id);
 }
 
 function cleanupAwards (awards) {
