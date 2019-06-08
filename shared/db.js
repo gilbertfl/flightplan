@@ -1,6 +1,7 @@
 var Connection = require('tedious').Connection;
 var Request = require('tedious').Request;
 var ConnectionPool = require('tedious-connection-pool');
+var TYPES = require('tedious').TYPES;
 
 const fs = require('fs')
 const path = require('path')
@@ -12,10 +13,27 @@ const prompts = require('../shared/prompts')
 //let _db = null
 let _pool = null
 
-function db () {
-  return _db
-}
+// function db () {
+//   return _db
+// }
 
+// */
+// server?: string;
+
+// /**
+//  * Once you set domain, driver will connect to SQL Server using domain login.
+//  */
+// domain?: string;
+
+// /**
+//  * Further options
+//  */
+// options?: ConnectionOptions;
+
+// /**
+//  * Authentication Options
+//  */
+// authentication?: ConnectionAuthentication;
 
 // Create connection to database
 var connectionConfig =
@@ -34,7 +52,7 @@ var connectionConfig =
         encrypt: true, 
         rowCollectionOnRequestCompletion: true // <-- allows rows in request callback as per https://tediousjs.github.io/tedious/api-request.html
     }
-}
+};
 var poolConfig = {
   min: 2,
   max: 4,
@@ -49,7 +67,7 @@ async function open () {
     //create the pool
     _pool = new ConnectionPool(poolConfig, connectionConfig);
 
-    pool.on('error', function(err) {
+    _pool.on('error', function(err) {
         console.error(err);
     });
   
@@ -74,19 +92,126 @@ async function open () {
     // await dbOnEventFunction('connect');
   }
 
-  return _db;
+  return _pool;
 }
 
 // override promise generation so we can return *both* rowcount and rows
-function createPromiseFromRequest(db, sql, requestFunction) {
+function createPromiseFromRequest(db, param, requestFunction) {
   return new Promise((resolve, reject) => {
-    requestFunction(db, sql, function(err, rowCount, rows) {
+    requestFunction(db, param, function(err, rowCount, rows) {
       if (err) {
         reject(err);
       } else {
         resolve({ rowCount, rows });
       }
     });
+  });
+}
+
+function acquireConnection(pool) {
+  return new Promise((resolve, reject) => {
+     pool.acquire(function (err, database) {
+      if (err) {
+        console.error(err);
+        reject(err);
+      } else {
+        resolve(database);
+      }
+    });
+  });
+}
+acquireConnection[util.promisify.custom] = (innerpool) => acquireConnection(innerpool);
+
+async function getRequestsForOW(route) {
+  
+  var database = await acquireConnection(_pool);
+
+  var oneWayFn = function (db, route, requestCallback) {
+    // Format dates
+    const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
+    const departStr = departDate || null
+    const returnStr = returnDate || null
+
+    // One-Way route
+    const sql = 'SELECT * FROM requests WHERE ' +
+    'engine = @engine AND partners = @partners AND cabin = @cabin AND quantity = @quantity AND (' +
+    '(fromCity = @fromCity AND toCity = @toCity AND departDate = @departStr) OR ' +
+    '(fromCity = @toCity AND toCity = @fromCity AND returnDate = @departStr))'
+
+    var request = new Request(sql, requestCallback);  
+    request.addParameter('engine', TYPES.VarChar, engine);
+    request.addParameter('partners', TYPES.Bit, partners ? 1 : 0);
+    request.addParameter('cabin', TYPES.VarChar, cabin);
+    request.addParameter('quantity', TYPES.Int, quantity);
+    request.addParameter('fromCity', TYPES.VarChar, fromCity);
+    request.addParameter('toCity', TYPES.VarChar, toCity);
+    request.addParameter('departStr', TYPES.VarChar, departStr);
+    db.execSql(request);
+  };
+  oneWayFn[util.promisify.custom] = (innerdb, innerroute) => createPromiseFromRequest(innerdb, innerroute, oneWayFn);
+  const getRequestsFn = util.promisify(oneWayFn);
+  var result = await getRequestsFn(database, route);
+  var rows = result.rows;
+  database.release();
+  return rows;
+}
+
+async function getRequestsForRT(route) {
+  // Format dates
+  const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
+  const departStr = departDate || null
+  const returnStr = returnDate || null
+
+  // Round-Trip route
+  const sql = 'SELECT * FROM requests WHERE ' +
+      'engine = @engine AND partners = @partners AND cabin = @cabin AND quantity = @quantity AND (' +
+      '(fromCity = @fromCity AND toCity = @toCity AND (departDate = @departStr OR returnDate = @returnStr)) OR ' +
+      '(fromCity = @toCity AND toCity = @fromCity AND (departDate = @returnStr OR returnDate = @departStr)))'
+  
+  _pool.acquire(async function (err, database) {
+    if (err) {
+        console.error(err);
+        return;
+    }
+    var roundTripFn = function (db, sql, requestCallback) {
+      var request = new Request(sql, requestCallback);  
+      request.addParameter('engine', TYPES.VarChar, engine);
+      request.addParameter('partners', TYPES.Bit, partners ? 1 : 0);
+      request.addParameter('cabin', TYPES.VarChar, cabin);
+      request.addParameter('quantity', TYPES.Int, quantity);
+      request.addParameter('fromCity', TYPES.VarChar, fromCity);
+      request.addParameter('toCity', TYPES.VarChar, toCity);
+      request.addParameter('departStr', TYPES.VarChar, departStr);
+      request.addParameter('returnStr', TYPES.VarChar, returnStr);
+      db.execSql(request);
+    };
+    roundTripFn[util.promisify.custom] = (innerdb, innersql) => createPromiseFromRequest(innerdb, innersql, roundTripFn);
+    const getRequestsFn = util.promisify(roundTripFn);
+    var result = await getRequestsFn(database, sql);
+    var rows = result.rows;
+    database.release();
+    return rows;
+  });
+}
+
+async function getAllRequests() {
+  _pool.acquire(async function (err, database) {
+    if (err) {
+        console.error(err);
+        return;
+    }
+    var getAllRequestsFn = function (db, sql, requestCallback) {
+      var request = new Request(db, requestCallback);
+      db.execSql(request);
+    };
+    getAllRequestsFn[util.promisify.custom] = (innerdb, innersql) => 
+      db.createPromiseFromRequest(innerdb, innersql, getAllRequestsFn);
+    const getAllRequestsPromise = util.promisify(getAllRequestsFn);
+    var allRoutesResult = await getAllRequestsPromise(database, 'SELECT * FROM requests');
+    console.log("all routes result", allRoutesResult);
+    var rows = allRoutesResult.rows;
+    database.release();
+    return rows;
   });
 }
 
@@ -171,6 +296,9 @@ function rollback () {
 
 module.exports = {
 //  db,
+  getAllRequests, 
+  getRequestsForRT, 
+  getRequestsForOW, 
   open,
   insertRow,
   coerceType,
