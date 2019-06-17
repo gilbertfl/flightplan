@@ -393,14 +393,18 @@ const main = async (args) => {
       }
 
       // Write request and awards (if parsed) to database
-      const requestId = helpers.saveRequest(results)
-      if (awards) {
-        if (awards.length > 0) {
-          daysRemaining = terminate // Reset termination counter
-        }
-        const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
-        helpers.saveAwards(requestId, awards, placeholders)
-      }
+      const saveRequestTransaction = await helpers.saveRequest(results);
+      saveRequestTransaction.on("commit", err => {
+        console.log("committed");
+      });
+      const requestId = 'who knows!';
+      // if (awards) {
+      //   if (awards.length > 0) {
+      //     daysRemaining = terminate // Reset termination counter
+      //   }
+      //   const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
+      //   helpers.saveAwards(requestId, awards, placeholders)
+      // }
     }
     if (skipped > 0) {
       console.log(`Skipped ${skipped} queries.`)

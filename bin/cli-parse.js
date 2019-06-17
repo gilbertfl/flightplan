@@ -79,7 +79,7 @@ const main = async (args) => {
 
       // Update the database
       const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
-      helpers.saveAwards(row.id, awards, placeholders)
+      await helpers.saveAwards(row.id, awards, placeholders)
       numAwards += awards.length
     }
 

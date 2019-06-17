@@ -111,11 +111,11 @@ async function saveRequest (results) {
   }
 
   // Insert the row
-  return await db.insertRow('requests', row).lastInsertROWID
+  return await db.saveRequest(row);
 }
 
 async function saveAwards (requestId, awards, placeholders) {
-  const ids = []
+  
 
   // Transform objects to rows
   const rows = [ ...placeholders ]
@@ -138,31 +138,7 @@ async function saveAwards (requestId, awards, placeholders) {
     })
   }
 
-  // Wrap everything in a transaction
-  let success = false
-  db.begin()
-  try {
-    for (const row of rows) {
-      const { segments } = row
-      delete row.segments
-
-      // Save the individual award and get it's ID
-      row.requestId = requestId
-      const awardId = await db.insertRow('awards', row).lastInsertROWID
-      ids.push(awardId)
-
-      // Now add each segment
-      if (segments) {
-        segments.forEach((segment, position) => {
-          saveSegment(awardId, position, segment)
-        })
-      }
-    }
-    success = true
-  } finally {
-    success ? db.commit() : db.rollback()
-  }
-  return success ? ids : null
+  await db.saveAwards(requestId, rows);
 }
 
 async function saveSegment (awardId, position, segment) {
@@ -186,7 +162,7 @@ async function saveSegment (awardId, position, segment) {
   row.position = position
 
   // Save the individual award and get it's ID
-  return await db.insertRow('segments', row).lastInsertROWID
+  return await db.saveSegment(row);
 }
 
 module.exports = {
