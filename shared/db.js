@@ -213,73 +213,73 @@ async function saveSegment(row) {
   });
 }
 
-async function doSaveRequest(transaction, row, callback) {
-  return await transaction.begin(callback);
+function doSaveRequest(transaction, row, resolve, reject) {
+  transaction.begin(transactionBeginErr => {
+    if (transactionBeginErr) {
+      console.error("save request transaction failed to begin.", transactionBeginErr);
+      reject(transactionBeginErr);
+    } else {
+      try {
+        transaction.request()
+          .input('engine', sql.VarChar, row.engine)
+          .input('partners', sql.Bit, row.partners ? 1 : 0)
+          .input('cabin', sql.VarChar, row.cabin)
+          .input('quantity', sql.Int, row.quantity)
+          .input('fromCity', sql.VarChar, row.fromCity)
+          .input('toCity', sql.VarChar, row.toCity)
+          .input('departStr', sql.VarChar, row.departDate)
+          .input('returnStr', sql.VarChar, row.returnDate)
+          .input('assets', sql.VarChar, row.assets)
+          .query('INSERT requests (engine,partners,fromCity,toCity,departDate,returnDate,cabin,quantity,assets) OUTPUT INSERTED.id ' + 
+                  'VALUES (@engine, @partners, @fromCity, @toCity, @departStr, @returnStr, @cabin, @quantity, @assets)', (err, result) => {
+            if (err) {
+              console.error("query failed", err);
+              transaction.rollback(rollbackErr => {
+                if (rollbackErr) {
+                  console.error("Save request failed, and failed to roll back!", rollbackErr);
+                } else {
+                  console.error("Save request failed, successfully rolled back.");
+                }
+                reject(err);
+              });
+            } else {
+              transaction.commit(commitErr => {
+                if (commitErr) {
+                  console.error("transaction commit failed, rolling back.", commitErr);
+                  transaction.rollback(rollbackErr => {
+                    if (rollbackErr) {
+                      console.error("Save request failed, and failed to roll back!", rollbackErr);
+                    } else {
+                      console.error("Save request failed, successfully rolled back.");
+                    }
+                    reject(commitErr);
+                  });
+                } else {
+                  console.log("success", result);
+                  var insertedRecordId = result.recordset[0].id;
+                  resolve(insertedRecordId);
+                }
+              });
+            }
+          });
+      } catch (e) {
+        console.error("Unhandled exception while saving request.", e);
+        //success = false;
+        transaction.rollback(rollbackErr => {
+          if (rollbackErr) {
+            console.error("Save request failed, and failed to roll back!", rollbackErr);
+          } else {
+            console.error("Save request failed, successfully rolled back.");
+          }
+          reject(e);
+        });
+      } 
+    }
+  });
 }
 doSaveRequest[util.promisify.custom] = (transaction, row) => {
   return new Promise((resolve, reject) => {
-    transaction.begin(async transactionBeginErr => {
-      if (transactionBeginErr) {
-        console.error("save request transaction failed to begin.", transactionBeginErr);
-        reject(transactionBeginErr);
-      } else {
-        try {
-          await transaction.request()
-            .input('engine', sql.VarChar, row.engine)
-            .input('partners', sql.Bit, row.partners ? 1 : 0)
-            .input('cabin', sql.VarChar, row.cabin)
-            .input('quantity', sql.Int, row.quantity)
-            .input('fromCity', sql.VarChar, row.fromCity)
-            .input('toCity', sql.VarChar, row.toCity)
-            .input('departStr', sql.VarChar, row.departDate)
-            .input('returnStr', sql.VarChar, row.returnDate)
-            .input('assets', sql.VarChar, row.assets)
-            .query('INSERT requests (engine,partners,fromCity,toCity,departDate,returnDate,cabin,quantity,assets) OUTPUT INSERTED.id ' + 
-                    'VALUES (@engine, @partners, @fromCity, @toCity, @departStr, @returnStr, @cabin, @quantity, @assets)', (err, result) => {
-              if (err) {
-                console.error("query failed", err);
-                transaction.rollback(rollbackErr => {
-                  if (rollbackErr) {
-                    console.error("Save request failed, and failed to roll back!", rollbackErr);
-                  } else {
-                    console.error("Save request failed, successfully rolled back.");
-                  }
-                  reject(err);
-                });
-              } else {
-                transaction.commit(commitErr => {
-                  if (commitErr) {
-                    console.error("transaction commit failed, rolling back.", commitErr);
-                    transaction.rollback(rollbackErr => {
-                      if (rollbackErr) {
-                        console.error("Save request failed, and failed to roll back!", rollbackErr);
-                      } else {
-                        console.error("Save request failed, successfully rolled back.");
-                      }
-                      reject(commitErr);
-                    });
-                  } else {
-                    console.log("success", result);
-                    var insertedRecordId = result.recordset[0].id;
-                    resolve(insertedRecordId);
-                  }
-                });
-              }
-            });
-        } catch (e) {
-          console.error("Unhandled exception while saving request.", e);
-          //success = false;
-          transaction.rollback(rollbackErr => {
-            if (rollbackErr) {
-              console.error("Save request failed, and failed to roll back!", rollbackErr);
-            } else {
-              console.error("Save request failed, successfully rolled back.");
-            }
-            reject(e);
-          });
-        } 
-      }
-    });
+    doSaveRequest(transaction, row, resolve, reject);
   });
 };
 
@@ -290,7 +290,8 @@ async function saveRequest(row) {
 
   // make a new transaction in the pool and actually save the request!
   const transaction = _pool.transaction();
-  return await promisifiedSaveRequest(transaction, row);
+  var result = await promisifiedSaveRequest(transaction, row);
+  return result;
 }
 
 // returns nothing, TODO: do in 1 big transaction!!
@@ -312,8 +313,6 @@ async function saveAwards(requestId, rows) {
       } else {
 
         try {
-          
-          
           const { segments } = row;
           delete row.segments;
 
