@@ -1,8 +1,8 @@
 const sql = require('mssql')
+const util = require('util')
 const fs = require('fs')
 const path = require('path')
 const rimraf = require('rimraf')
-const util = require('util');
 const paths = require('./paths')
 const prompts = require('../shared/prompts')
 
@@ -16,17 +16,24 @@ var connectionConfig =
   password: paths.databasePassword, 
   server: paths.database, 
   database: paths.databaseName, 
-  encrypt: true
+  encrypt: true, 
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000
+  }
 };
-
-sql.on('error', err => {
-  console.error(err);
-})
 
 async function open () {
   if (!_pool) {
     console.log(`Attempting to open database pool: ${paths.database}`);
-    _pool = await sql.connect(connectionConfig);
+    //_pool = await sql.connect(connectionConfig);
+    _pool = new sql.ConnectionPool(connectionConfig);
+    await _pool.connect();
+
+    _pool.on('error', err => {
+      console.error(err);
+    })
   }
 
   return _pool;
@@ -139,166 +146,238 @@ async function cleanupRequest(requestId) {
 
 async function saveSegment(row) {
   const transaction = _pool.transaction();
-  let success = false;
-  const idToReturn = null;
-
-  transaction.begin(async err => {
-
-    transaction.on('rollback', aborted => {
-      console.error("save segment transaction rolled back", aborted);
-    });
-
-    try {
-      const entries = Object.entries(row);
-      const colNames = entries.map(x => x[0]);
-      const colVals = entries.map(x => coerceType(x[1]));
-      var request = transaction.request();
-      await request.query(`INSERT segments (${colNames.join(',')}) OUTPUT INSERTED.id VALUES (${colVals.map(x => '?').join(',')});`, (err, result) => {
-        if (err) {
-          success = false;
-        } else {
-          // TODO: how to get idToReturn?
-          console.log("segments successfully inserted, do something with result", result);
-        }
-      });
-    } finally {
-      if (success) {
-        transaction.commit(tErr => tErr && next('transaction commit error'));
-      } else { 
-        transaction.rollback(err => {
-          console.error("Unable to roll back on error during sql transaction!");
-        });
-      }
-    }
-
-    return success ? idToReturn : null;
-  });
-
-  return transaction;
-}
-
-async function saveRequest(row) {
-  const transaction = _pool.transaction();
-  let success = false;
-  const idToReturn = null;
-
-  transaction.begin(async err => {
-
-    transaction.on('rollback', aborted => {
-      console.error("save request transaction rolled back", aborted);
-    });
-
-    try {
-      const entries = Object.entries(row);
-      const colNames = entries.map(x => x[0]);
-      const colVals = entries.map(x => coerceType(x[1]));
-      var request = transaction.request();
-      await request.query(`INSERT requests (${colNames.join(',')}) OUTPUT INSERTED.id VALUES (${colVals.map(x => '?').join(',')});`, (err, result) => {
-        if (err) {
-          success = false;
-        } else {
-          // TODO: how to get idToReturn?
-          console.log("get result somehow", result);
-        }
-      });
-    } finally {
-      if (success) {
-        transaction.commit(tErr => tErr && next('transaction commit error'));
-      } else { 
-        transaction.rollback(err => {
-          console.error("Unable to roll back on error during sql transaction!");
-        });
-      }
-    }
-
-    return success ? idToReturn : null;
-  });
-
-  return transaction;
-}
-
-async function saveAwards(requestId, rows) {
-  // Wrap everything in a transaction
-  const transaction = _pool.transaction();
+  //let success = false;
   
-  transaction.begin(async err => {
+  transaction.begin(async transactionBeginErr => {
 
-    let success = true;
-    const saveAwardResults = [];
-    const ids = [];
-
-    transaction.on('rollback', aborted => {
-      console.error("save awards transaction rolled back", aborted);
-      success = false;
-    });
-
-    try {
-      for (const row of rows) {
-        const { segments } = row;
-        delete row.segments;
-
-        // Save the individual award and get it's ID
-        row.requestId = requestId;
-
-        const entries = Object.entries(row);
-        const colNames = entries.map(x => x[0]);
-        const colVals = entries.map(x => coerceType(x[1]));
-        const innerRequest = transaction.request();
-
-        saveAwardResults.push(await innerRequest.query(`INSERT awards (${colNames.join(',')}) OUTPUT INSERTED.id VALUES (${colVals.map(x => '?').join(',')});`));
-        //   , (err, result) => {
-        //   if (err) {
-        //     success = false;
-        //   } else {
-        //     // TODO: how to get awardid?
-        //     console.log("somehow get award id", result);
-
-        //     ids.push(awardId);
-
-        //     // Now add each segment
-        //     if (segments) {
-        //       segments.forEach((segment, position) => {
-        //         saveSegment(awardId, position, segment)
-        //       })
-        //     }
-        //   }
-        // });
-      }
-      transaction.commit(err => {
-          console.error("transaction commit failed, rolling back.");
-          success = false;
-      });
-    } catch {
-      transaction.rollback(err => {
-        if (err) {
-          console.error("unhandled exception, and could not roll back!");
-        } else {
-          console.error("unhandled exception, rolled back.");
-        }
-      });
-      success = false;
-    }
-
-    if (success) {
-      for (const saveAwardResult of saveAwardResults) {
-
-        console.log(saveAwardResult);
-
-        ids.push(awardId);
-
-        // Now add each segment
-        if (segments) {
-          segments.forEach((segment, position) => {
-            saveSegment(awardId, position, segment)
-          })
-        }
+    if (transactionBeginErr) {
+      console.error("save segment transaction failed to begin.", transactionBeginErr);
+    } else {
+      try {
+        await transaction.request()
+            .input('awardId', sql.Int, awardId)
+            .input('position', sql.Int, row.position)
+            .input('airline', sql.VarChar, row.airline)
+            .input('flight', sql.VarChar, row.flight)
+            .input('aircraft', sql.VarChar, row.aircraft)
+            .input('fromCity', sql.VarChar, row.fromCity)
+            .input('toCity', sql.VarChar, row.toCity)
+            .input('date', sql.VarChar, row.date)
+            .input('departure', sql.VarChar, row.departure)
+            .input('arrival', sql.VarChar, row.arrival)
+            .input('duration', sql.Int, row.duration)
+            .input('nextConnection', sql.Int, row.nextConnection)
+            .input('cabin', sql.VarChar, row.cabin)
+            .input('stops', sql.Int, row.stops)
+            .input('lagDays', sql.Int, row.lagDays)
+            .input('bookingCode', sql.VarChar, row.bookingCode)
+            .query('INSERT requests (awardId, position, airline, flight, aircraft, fromCity, toCity, date, departure, arrival, duration, nextConnection, cabin, stops, lagDays, bookingCode) OUTPUT INSERTED.id ' + 
+                    'VALUES (@awardId, @position, @airline, @flight, @aircraft, @fromCity, @toCity, @date, @departure, @arrival, @duration, @nextConnection, @cabin, @stops, @lagDays, @bookingCode)', (err, result) => {
+              if (err) {
+                console.error("query failed", err);
+                transaction.rollback(rollbackErr => {
+                  if (rollbackErr) {
+                    console.error("Save request failed, and failed to roll back!", rollbackErr);
+                  } else {
+                    console.error("Save request failed, successfully rolled back.");
+                  }
+                  reject(err);
+                });
+              } else {
+                transaction.commit(commitErr => {
+                  if (commitErr) {
+                    console.error("transaction commit failed, rolling back.", commitErr);
+                    transaction.rollback(rollbackErr => {
+                      if (rollbackErr) {
+                        console.error("Save request failed, and failed to roll back!", rollbackErr);
+                      } else {
+                        console.error("Save request failed, successfully rolled back.");
+                      }
+                      reject(commitErr);
+                    });
+                  } else {
+                    console.log("success", result);
+                    var insertedRecordId = result.recordset[0].id;
+                    resolve(insertedRecordId);
+                  }
+                });
+              }
+            });
+      } catch (e) {
+        console.error("Unhandled exception while saving segment.", e);
+        transaction.rollback(err => {
+          console.error("Unable to roll back on error during sql transaction!");
+        });
       }
     }
-
-    return success ? ids : null;
   });
+}
 
-  return transaction;
+async function doSaveRequest(transaction, row, callback) {
+  return await transaction.begin(callback);
+}
+doSaveRequest[util.promisify.custom] = (transaction, row) => {
+  return new Promise((resolve, reject) => {
+    transaction.begin(async transactionBeginErr => {
+      if (transactionBeginErr) {
+        console.error("save request transaction failed to begin.", transactionBeginErr);
+        reject(transactionBeginErr);
+      } else {
+        try {
+          await transaction.request()
+            .input('engine', sql.VarChar, row.engine)
+            .input('partners', sql.Bit, row.partners ? 1 : 0)
+            .input('cabin', sql.VarChar, row.cabin)
+            .input('quantity', sql.Int, row.quantity)
+            .input('fromCity', sql.VarChar, row.fromCity)
+            .input('toCity', sql.VarChar, row.toCity)
+            .input('departStr', sql.VarChar, row.departDate)
+            .input('returnStr', sql.VarChar, row.returnDate)
+            .input('assets', sql.VarChar, row.assets)
+            .query('INSERT requests (engine,partners,fromCity,toCity,departDate,returnDate,cabin,quantity,assets) OUTPUT INSERTED.id ' + 
+                    'VALUES (@engine, @partners, @fromCity, @toCity, @departStr, @returnStr, @cabin, @quantity, @assets)', (err, result) => {
+              if (err) {
+                console.error("query failed", err);
+                transaction.rollback(rollbackErr => {
+                  if (rollbackErr) {
+                    console.error("Save request failed, and failed to roll back!", rollbackErr);
+                  } else {
+                    console.error("Save request failed, successfully rolled back.");
+                  }
+                  reject(err);
+                });
+              } else {
+                transaction.commit(commitErr => {
+                  if (commitErr) {
+                    console.error("transaction commit failed, rolling back.", commitErr);
+                    transaction.rollback(rollbackErr => {
+                      if (rollbackErr) {
+                        console.error("Save request failed, and failed to roll back!", rollbackErr);
+                      } else {
+                        console.error("Save request failed, successfully rolled back.");
+                      }
+                      reject(commitErr);
+                    });
+                  } else {
+                    console.log("success", result);
+                    var insertedRecordId = result.recordset[0].id;
+                    resolve(insertedRecordId);
+                  }
+                });
+              }
+            });
+        } catch (e) {
+          console.error("Unhandled exception while saving request.", e);
+          //success = false;
+          transaction.rollback(rollbackErr => {
+            if (rollbackErr) {
+              console.error("Save request failed, and failed to roll back!", rollbackErr);
+            } else {
+              console.error("Save request failed, successfully rolled back.");
+            }
+            reject(e);
+          });
+        } 
+      }
+    });
+  });
+};
+
+// returns RequestId on success; null on failure
+async function saveRequest(row) {
+  // since we need to wait around for the result of the insert, promisify the save method so we can await it
+  var promisifiedSaveRequest = util.promisify(doSaveRequest);
+
+  // make a new transaction in the pool and actually save the request!
+  const transaction = _pool.transaction();
+  return await promisifiedSaveRequest(transaction, row);
+}
+
+// returns nothing, TODO: do in 1 big transaction!!
+async function saveAwards(requestId, rows) {
+
+  for (const row of rows) {
+    
+    const transaction = _pool.transaction();
+    
+    transaction.begin(async transactionBeginErr => {
+      
+      if (transactionBeginErr) {
+        console.error("Save awards transaction failed to begin, rolling back.", transactionBeginErr);
+        transaction.rollback(rollbackErr => {
+          if (rollbackErr) {
+            console.error("Could not roll back!", rollbackErr);
+          }
+        });
+      } else {
+
+        try {
+          
+          
+          const { segments } = row;
+          delete row.segments;
+
+          await transaction.request()
+            .input('requestId', sql.Int, requestId)
+            .input('engine', sql.VarChar, row.engine)
+            .input('partner', sql.Bit, row.partner ? 1 : 0)
+            .input('fromCity', sql.VarChar, row.fromCity)
+            .input('toCity', sql.VarChar, row.toCity)
+            .input('date', sql.VarChar, row.date)
+            .input('cabin', sql.VarChar, row.cabin)
+            .input('mixed', sql.Bit, row.mixed)
+            .input('duration', sql.Int, row.duration)
+            .input('stops', sql.Int, row.stops)
+            .input('quantity', sql.Int, row.quantity)
+            .input('mileage', sql.Int, row.mileage)
+            .input('fees', sql.VarChar, row.fees)
+            .input('fares', sql.VarChar, row.fares)
+            .query('INSERT awards (requestId,engine,partner,fromCity,toCity,date,cabin,mixed,duration,stops,quantity,mileage,fees,fares) OUTPUT INSERTED.id ' + 
+              'VALUES (@requestId, @engine, @partner, @fromCity, @toCity, @date, @cabin, @mixed, @duration, @stops, @quantity, @mileage, @fees, @fares)', async (err, result) => {
+                if (err) {
+                  console.error("Save award query failed", err);
+                  transaction.rollback(rollbackErr => {
+                    if (rollbackErr) {
+                      console.error("Save award failed, and failed to roll back!", rollbackErr);
+                    } else {
+                      console.error("Save award failed, successfully rolled back.");
+                    }
+                  });
+                } else {
+                  const awardId = result.recordset[0].id;
+
+                  // Now add each segment
+                  // TODO: actually wait until transaction is committed to awards before doing this!!
+                  if (segments) {
+                    segments.forEach(async (segment, position) => {
+                      await saveSegment(awardId, position, segment)
+                    })
+                  }
+                } 
+              });
+
+          // for now, commit each award separately
+          await transaction.commit(commitErr => {
+            if (commitErr) {
+              console.error("transaction commit failed, rolling back.", commitErr);
+              transaction.rollback(rollbackErr => {
+                if (rollbackErr) {
+                  console.error("Could not roll back!", rollbackErr);
+                }
+              });
+            } 
+          });
+        } catch (e) {
+          console.error("unhandled exception while saving awards, rolling back.", e);
+          transaction.rollback(rollbackErr => {
+            if (rollbackErr) {
+              console.error("unhandled exception, and could not roll back!", rollbackErr);
+            }
+          });
+        }
+      }
+    });
+  }
 }
 
 function coerceType (val) {

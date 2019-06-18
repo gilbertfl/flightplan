@@ -2,7 +2,7 @@ const program = require('commander')
 const fs = require('fs')
 const prompt = require('syncprompt')
 const timetable = require('timetable-fns')
-
+const sleep = require('await-sleep')
 const fp = require('../src')
 const accounts = require('../shared/accounts')
 const db = require('../shared/db')
@@ -393,22 +393,22 @@ const main = async (args) => {
       }
 
       // Write request and awards (if parsed) to database
-      const saveRequestTransaction = await helpers.saveRequest(results);
-      saveRequestTransaction.on("commit", err => {
-        console.log("committed");
-      });
-      const requestId = 'who knows!';
-      // if (awards) {
-      //   if (awards.length > 0) {
-      //     daysRemaining = terminate // Reset termination counter
-      //   }
-      //   const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
-      //   helpers.saveAwards(requestId, awards, placeholders)
-      // }
+      const requestId = await helpers.saveRequest(results);
+      if (awards) {
+        if (awards.length > 0) {
+          daysRemaining = terminate // Reset termination counter
+        }
+        const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
+        helpers.saveAwards(requestId, awards, placeholders)
+      }
     }
     if (skipped > 0) {
       console.log(`Skipped ${skipped} queries.`)
     }
+
+    // allow async connections/requests/etc to settle prior to closing app
+    await sleep(5000);
+
     logger.success('Search complete!')
   } catch (err) {
     fatal('A fatal error occurred!', err)
