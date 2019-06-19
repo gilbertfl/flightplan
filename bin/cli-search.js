@@ -2,7 +2,7 @@ const program = require('commander')
 const fs = require('fs')
 const prompt = require('syncprompt')
 const timetable = require('timetable-fns')
-const sleep = require('await-sleep')
+
 const fp = require('../src')
 const accounts = require('../shared/accounts')
 const db = require('../shared/db')
@@ -405,10 +405,6 @@ const main = async (args) => {
     if (skipped > 0) {
       console.log(`Skipped ${skipped} queries.`)
     }
-
-    // allow async connections/requests/etc to settle prior to closing app
-    await sleep(5000);
-
     logger.success('Search complete!')
   } catch (err) {
     fatal('A fatal error occurred!', err)
