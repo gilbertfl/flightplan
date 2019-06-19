@@ -137,6 +137,13 @@ async function getAllAwards() {
   return result.recordset;
 }
 
+async function getSegments(awardId) {
+  var result = await _pool.request()
+    .input('awardId', sql.Int, awardId)
+    .query('SELECT * FROM segments WHERE awardId = @awardId');
+  return result.recordset;
+}
+
 async function cleanupRequest(requestId) {
   var result = await _pool.request()
     .input('requestId', sql.Int, requestId)
@@ -144,7 +151,7 @@ async function cleanupRequest(requestId) {
   return result.recordset;
 }
 
-async function getAwardsForRequest(requestId) {
+async function getRequest(requestId) {
   var result = await _pool.request()
     .input('requestId', sql.Int, requestId)
     .query('SELECT * FROM requests WHERE id = @requestId');
@@ -473,6 +480,8 @@ module.exports = {
   getAllRequests, 
   getRequestsForRT, 
   getRequestsForOW, 
+  getRequest, 
+  getSegments, 
   getAllAwards, 
   getAwardsForRT,
   getAwardsForOW, 

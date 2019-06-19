@@ -48,7 +48,7 @@ const main = async (args) => {
     const failed = []
     for (const row of getRequests(args.website, force)) {
       // First delete all awards associated with this request
-      const oldAwards = db.getAwardsForRequest(row.id);
+      const oldAwards = await db.getRequest(row.id);
       helpers.cleanupAwards(oldAwards)
 
       // Create a Results instance from the row

@@ -107,9 +107,8 @@ app.get('/api/search', async (req, res, next) => {
     let awards = db.db().prepare(query).all(...params)
 
     // Fetch segments for each award
-    const stmt = db.db().prepare('SELECT * FROM segments WHERE awardId = ?')
     for (const award of awards) {
-      award.segments = stmt.all(award.id)
+      award.segments = await db.getSegments(award.id)
     }
     console.timeEnd('search')
 
