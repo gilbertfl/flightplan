@@ -8,7 +8,6 @@
   },
   "scripts": {
     "client": "cd client && yarn start",
-    "clientprod": "cd client && yarn build && yarn global add serve && serve -s build",
     "server": "nodemon bin/cli-server.js",
     "dev": "concurrently --kill-others-on-fail -p \"[{name}]\" -n \"CLIENT,SERVER\" -c \"black.bgBlue.bold,black.bgGreen.bold\" \"yarn client\" \"yarn server\"",
     "test": "jest"
@@ -21,7 +20,6 @@
     "address": "^1.0.3",
     "await-sleep": "^0.0.1",
     "mssql": "^5.1.0",
-    "async": "^2.6.2",
     "chalk": "^2.4.1",
     "cheerio": "^1.0.0-rc.2",
     "commander": "github:jd20/commander.js#master",
@@ -42,6 +40,6 @@
     "concurrently": "^3.5.1",
     "jest": "^23.6.0",
     "jest-cli": "^23.6.0",
-    "nodemon": "^1.19.1"
+    "nodemon": "^1.17.3"
   }
 }

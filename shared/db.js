@@ -144,19 +144,15 @@ async function cleanupRequest(requestId) {
   return result.recordset;
 }
 
-async function saveSegment(row) {
-  const transaction = _pool.transaction();
-  //let success = false;
-  
-  transaction.begin(async transactionBeginErr => {
-
+function doSaveSegment(transaction, awardId, position, row, resolve, reject) {
+  transaction.begin(transactionBeginErr => {
     if (transactionBeginErr) {
       console.error("save segment transaction failed to begin.", transactionBeginErr);
     } else {
       try {
-        await transaction.request()
+        transaction.request()
             .input('awardId', sql.Int, awardId)
-            .input('position', sql.Int, row.position)
+            .input('position', sql.Int, position)
             .input('airline', sql.VarChar, row.airline)
             .input('flight', sql.VarChar, row.flight)
             .input('aircraft', sql.VarChar, row.aircraft)
@@ -171,7 +167,7 @@ async function saveSegment(row) {
             .input('stops', sql.Int, row.stops)
             .input('lagDays', sql.Int, row.lagDays)
             .input('bookingCode', sql.VarChar, row.bookingCode)
-            .query('INSERT requests (awardId, position, airline, flight, aircraft, fromCity, toCity, date, departure, arrival, duration, nextConnection, cabin, stops, lagDays, bookingCode) OUTPUT INSERTED.id ' + 
+            .query('INSERT segments (awardId, position, airline, flight, aircraft, fromCity, toCity, date, departure, arrival, duration, nextConnection, cabin, stops, lagDays, bookingCode) OUTPUT INSERTED.id ' + 
                     'VALUES (@awardId, @position, @airline, @flight, @aircraft, @fromCity, @toCity, @date, @departure, @arrival, @duration, @nextConnection, @cabin, @stops, @lagDays, @bookingCode)', (err, result) => {
               if (err) {
                 console.error("query failed", err);
@@ -196,7 +192,6 @@ async function saveSegment(row) {
                       reject(commitErr);
                     });
                   } else {
-                    console.log("success", result);
                     var insertedRecordId = result.recordset[0].id;
                     resolve(insertedRecordId);
                   }
@@ -211,6 +206,15 @@ async function saveSegment(row) {
       }
     }
   });
+}
+doSaveSegment[util.promisify.custom] = (transaction, awardId, position, row) => {
+  return new Promise((resolve, reject) => {
+    doSaveSegment(transaction, awardId, position, row, resolve, reject);
+  });
+};
+async function saveSegment(awardId, position, row) {
+  var promisifiedSaveSegment = util.promisify(doSaveSegment);
+  return await promisifiedSaveSegment(_pool.transaction(), awardId, position, row);
 }
 
 function doSaveRequest(transaction, row, resolve, reject) {
@@ -255,7 +259,6 @@ function doSaveRequest(transaction, row, resolve, reject) {
                     reject(commitErr);
                   });
                 } else {
-                  console.log("success", result);
                   var insertedRecordId = result.recordset[0].id;
                   resolve(insertedRecordId);
                 }
@@ -352,13 +355,17 @@ function doSaveAward(transaction, requestId, row, resolve, reject) {
                   // Now add each segment
                   // TODO: actually wait until transaction is committed to awards before doing this!!
                   if (segments) {
+                    // TODO: use better javascript skills to do this!!
+                    var segmentsArray = [];
                     segments.forEach((segment, position) => {
-                      saveSegment(awardId, position, segment).then(() => {
-                        resolve();
+                      segmentsArray.push({
+                        segment: segment, 
+                        awardId: awardId
                       });
                     })
+                    resolve(segmentsArray);
                   } else {
-                    resolve();
+                    resolve(null);
                   }
                 } 
               });
@@ -384,9 +391,13 @@ doSaveAward[util.promisify.custom] = (pool, requestId, row) => {
 async function saveAwards(requestId, rows) {
   var promisifiedSaveAward = util.promisify(doSaveAward);
   for (const row of rows) {
-    await promisifiedSaveAward(_pool, requestId, row);
-    
-    // TODO: should we return result of above call?  for now no caller needs it, so no...
+    // if saving fails, promise is rejected and an exception *should* be thrown
+    var segments = await promisifiedSaveAward(_pool, requestId, row);
+    if (segments) {
+      for (let i=0; i<segments.length; i++) {
+        await saveSegment(segments[i].awardId, i, segments[i].segment);
+      }
+    }
   }
 }
 

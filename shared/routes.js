@@ -1,5 +1,5 @@
 const chalk = require('chalk');
-const util = require('util');
+
 const db = require('./db');
 const paths = require('./paths');
 
@@ -33,10 +33,8 @@ function getOrSet (map, key) {
 async function find (route) {
   const map = new Map()
 
-  const requestsResult = await requests(route);
-
   // Update map with award requests
-  for (const row of requestsResult) {
+  for (const row of await requests(route)) {
     const { departDate, returnDate } = row
     let obj = getOrSet(map, key(row, departDate))
     obj.requests.push(row)
@@ -46,10 +44,8 @@ async function find (route) {
     }
   }
 
-  const awardsResult = await awards(route);
-
   // Now update with awards
-  for (const row of awardsResult) {
+  for (const row of await awards(route)) {
     let obj = getOrSet(map, key(row, row.date))
     obj.awards.push(row)
   }
@@ -59,9 +55,6 @@ async function find (route) {
 
 
 async function requests (route) {
-
-  console.log(route);
-
   // If no route defined, just select all records
   if (!route) {
     return await db.getAllRequests();
@@ -78,9 +71,6 @@ async function requests (route) {
 }
 
 async function awards (route) {
-
-  console.log(route);
-
   // If no route defined, just select all records
   if (!route) {
     return await db.getAllAwards();
