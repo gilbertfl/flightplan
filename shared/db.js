@@ -336,6 +336,19 @@ function doSaveAward(transaction, requestId, row, resolve, reject) {
                 } else {
                   const awardId = result.recordset[0].id;
 
+                  // for now, commit each award separately
+                  transaction.commit(commitErr => {
+                    if (commitErr) {
+                      console.error("transaction commit failed, rolling back.", commitErr);
+                      transaction.rollback(rollbackErr => {
+                        if (rollbackErr) {
+                          console.error("Could not roll back!", rollbackErr);
+                        }
+                      });
+                      reject(commitErr);
+                    } 
+                  });
+
                   // Now add each segment
                   // TODO: actually wait until transaction is committed to awards before doing this!!
                   if (segments) {
@@ -349,19 +362,6 @@ function doSaveAward(transaction, requestId, row, resolve, reject) {
                   }
                 } 
               });
-
-          // for now, commit each award separately
-          transaction.commit(commitErr => {
-            if (commitErr) {
-              console.error("transaction commit failed, rolling back.", commitErr);
-              transaction.rollback(rollbackErr => {
-                if (rollbackErr) {
-                  console.error("Could not roll back!", rollbackErr);
-                }
-              });
-              reject(commitErr);
-            } 
-          });
         } catch (e) {
           console.error("unhandled exception while saving awards, rolling back.", e);
           transaction.rollback(rollbackErr => {
@@ -384,15 +384,9 @@ doSaveAward[util.promisify.custom] = (pool, requestId, row) => {
 async function saveAwards(requestId, rows) {
   var promisifiedSaveAward = util.promisify(doSaveAward);
   for (const row of rows) {
-    var result = await promisifiedSaveAward(_pool, requestId, row);
+    await promisifiedSaveAward(_pool, requestId, row);
     
-    // TODO: how do we know failure?
-    if (result) {
-      // keep going?
-    } else {
-      // null == failure
-      return null;
-    }
+    // TODO: should we return result of above call?  for now no caller needs it, so no...
   }
 }
 
