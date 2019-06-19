@@ -144,6 +144,53 @@ async function cleanupRequest(requestId) {
   return result.recordset;
 }
 
+async function getAwardsForRequest(requestId) {
+  var result = await _pool.request()
+    .input('requestId', sql.Int, requestId)
+    .query('SELECT * FROM requests WHERE id = @requestId');
+  return result.recordset;
+}
+
+async function cleanupAwards(awards) {
+  const transaction = _pool.transaction();
+
+  transaction.begin(async transactionBeginErr => {
+    if (transactionBeginErr) {
+      console.error("save segment transaction failed to begin.", transactionBeginErr);
+    } else {
+      try {
+        for (const award of awards) {
+          await transaction.request()
+            .input('awardId', sql.Int, award.id)
+            .query('DELETE FROM segments WHERE awardId = @awardId');
+          await transaction.request()
+            .input('awardId', sql.Int, award.id)
+            .query('DELETE FROM awards WHERE id = @awardId');
+        }
+        
+        transaction.commit(commitErr => {
+          if (commitErr) {
+            console.error("transaction commit failed, rolling back.", commitErr);
+            transaction.rollback(rollbackErr => {
+              if (rollbackErr) {
+                console.error("Cleanup awards failed, and failed to roll back!", rollbackErr);
+              } else {
+                console.error("Cleanup awards failed, successfully rolled back.");
+              }
+            });
+          } 
+        });
+
+      } catch (e) {
+        console.error("Unhandled exception while saving segment.", e);
+        transaction.rollback(err => {
+          console.error("Unable to roll back on error during sql transaction!");
+        });
+      }
+    }
+  });
+}
+
 function doSaveSegment(transaction, awardId, position, row, resolve, reject) {
   transaction.begin(transactionBeginErr => {
     if (transactionBeginErr) {
@@ -292,9 +339,7 @@ async function saveRequest(row) {
 
 
 function doSaveAward(transaction, requestId, row, resolve, reject) {
-
     transaction.begin(transactionBeginErr => {
-      
       if (transactionBeginErr) {
         console.error("Save awards transaction failed to begin, rolling back.", transactionBeginErr);
         transaction.rollback(rollbackErr => {
@@ -304,7 +349,6 @@ function doSaveAward(transaction, requestId, row, resolve, reject) {
         });
         reject(transactionBeginErr);
       } else {
-
         try {
           const { segments } = row;
           delete row.segments;
@@ -438,6 +482,7 @@ module.exports = {
   saveRequest, 
   coerceType,
   count,
-  cleanupRequest, 
+  cleanupRequest,
+  cleanupAwards, 
   close 
 }

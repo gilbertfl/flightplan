@@ -45,7 +45,7 @@ function assetsForRequest (request) {
   return [...html, ...json, ...screenshot].map(x => x.path)
 }
 
-function cleanupRequest (request) {
+async function cleanupRequest (request) {
   // Delete assets from disk
   for (const filename of assetsForRequest(request)) {
     if (fs.existsSync(filename)) {
@@ -54,25 +54,11 @@ function cleanupRequest (request) {
   }
 
   // Remove from the database
-  //db.db().prepare('DELETE FROM requests WHERE id = ?').run(request.id)
-  db.cleanupRequest(request.id);
+  await db.cleanupRequest(request.id);
 }
 
-function cleanupAwards (awards) {
-  const stmtDelAward = db.db().prepare('DELETE FROM awards WHERE id = ?')
-  const stmtDelSegments = db.db().prepare('DELETE FROM segments WHERE awardId = ?')
-
-  db.begin()
-  let success = false
-  try {
-    for (const award of awards) {
-      stmtDelSegments.run(award.id)
-      stmtDelAward.run(award.id)
-    }
-    success = true
-  } finally {
-    success ? db.commit() : db.rollback()
-  }
+async function cleanupAwards (awards) {
+  await db.cleanupAwards(awards);
 }
 
 function loadRequest (row) {

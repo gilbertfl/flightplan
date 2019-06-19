@@ -15,6 +15,9 @@ program
   .parse(process.argv)
 
 function getRequests (engine, force) {
+
+  throw new exception("getRequests not moved to db class");
+
   const bind = []
 
   // Select only those requests without corresponding entries in awards table
@@ -45,7 +48,7 @@ const main = async (args) => {
     const failed = []
     for (const row of getRequests(args.website, force)) {
       // First delete all awards associated with this request
-      const oldAwards = db.db().prepare('SELECT id FROM awards WHERE requestId = ?').all(row.id)
+      const oldAwards = db.getAwardsForRequest(row.id);
       helpers.cleanupAwards(oldAwards)
 
       // Create a Results instance from the row
