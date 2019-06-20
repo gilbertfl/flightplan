@@ -1,10 +1,7 @@
 const sql = require('mssql')
 const util = require('util')
-const fs = require('fs')
-const path = require('path')
-const rimraf = require('rimraf')
 const paths = require('./paths')
-const prompts = require('../shared/prompts')
+const utils = require('../src/utils')
 
 let _pool = null;
 
@@ -452,20 +449,77 @@ async function saveAwards(requestId, rows) {
   }
 }
 
-function coerceType (val) {
-  if (typeof val === 'boolean') {
-    return val ? 1 : 0
+async function doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit) {
+
+  // Validate dates
+  if (!utils.validDate(startDate)) {
+    throw new Error('Invalid start date:', startDate);
   }
-  return val
-}
+  if (!utils.validDate(endDate)) {
+    throw new Error('Invalid end date:', endDate);
+  }
+  if (endDate < startDate) {
+    throw new Error(`Invalid date range for search: ${startDate} -> ${endDate}`);
+  }
 
-async function count (table) {
-  const sqlStr = `SELECT count(*) FROM ${table}`;
-  
-  const result = await _pool.request()
-    .query(sqlStr);
+  var request = _pool.request();
+    //.input('requestId', sql.Int, requestId);
 
-  return result ? result['count(*)'] : undefined
+  let query = 'SELECT * FROM awards WHERE ';
+  //const params = [];
+
+  // Add cities
+  //const cities = [ fromCity.toUpperCase(), toCity.toUpperCase() ];
+  if (direction === 'oneway') {
+    //query += 'fromCity = ? AND toCity = ?';
+    //params.push(...cities);
+    query += 'fromCity = @fromCity AND toCity = @toCity';
+  } else if (direction === 'roundtrip') {
+    //query += '((fromCity = ? AND toCity = ?) OR (toCity = ? AND fromCity = ?))';
+    //params.push(...cities, ...cities);
+    query += '((fromCity = @fromCity AND toCity = @toCity) OR (toCity = @fromCity AND fromCity = @toCity))';
+  } else {
+    throw new Error('Unrecognized direction parameter:', direction);
+  }
+  request = request.input('fromCity', sql.VarChar, fromCity.toUpperCase());
+  request = request.input('toCity', sql.VarChar, toCity.toUpperCase());
+
+  // Add dates
+  //query += ' AND date BETWEEN ? AND ?';
+  //params.push(startDate, endDate);
+  query += ' AND date BETWEEN @startDate AND @endDate';
+  request = request.input('startDate', sql.VarChar, startDate);
+  request = request.input('endDate', sql.VarChar, endDate);
+
+  // Add quantity
+  //query += ' AND quantity >= ?';
+  //params.push(parseInt(quantity));
+  query += ' AND quantity >= @quantity';
+  request = request.input('quantity', sql.Int, quantity);
+
+  // Add cabins
+  if (cabin) {
+    const values = cabin.split(',');
+    //query += ` AND cabin IN (${values.map(x => '?').join(',')})`;
+    //values.forEach(x => params.push(x));
+
+    // TODO: parameterize this 'IN' query!
+    query += ` AND cabin IN (${values.map(x => `'${x}'`)})`;
+  }
+
+  // Add limit
+  if (limit) {
+    //query += ' LIMIT ?';
+    //params.push(parseInt(limit));
+    query += ' LIMIT @resultLimit';
+    request = request.input('resultLimit', sql.Int, limit);
+  }
+
+  // Run SQL query
+  //let awards = db.db().prepare(query).all(...params);
+  var awards = await request.query(query);
+
+  return awards.recordset;
 }
 
 function close () {
@@ -489,9 +543,8 @@ module.exports = {
   saveAwards, 
   saveSegment, 
   saveRequest, 
-  coerceType,
-  count,
   cleanupRequest,
   cleanupAwards, 
+  doSearch, 
   close 
 }
