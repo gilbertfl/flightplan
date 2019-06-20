@@ -3,22 +3,18 @@ const express = require('express')
 const fp = require('../src')
 const db = require('../shared/db')
 const logger = require('../shared/logger')
-const utils = require('../src/utils')
-//var cors = require('cors')
 
 const app = express()
 const port = process.env.PORT || 5000
 
-// app.use(cors())
-// app.options('*', cors()) // include before other routes
-
+// manually turn on CORS for all origins (TODO: use cors npm package instead)
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   next();
 });
 
-app.get('/api/config', /*cors(),*/ async (req, res, next) => {
+app.get('/api/config', async (req, res, next) => {
   try {
     // Insert each website engine
     const engines = fp.supported().map((id) => {
@@ -45,7 +41,7 @@ app.get('/api/config', /*cors(),*/ async (req, res, next) => {
   }
 })
 
-app.get('/api/search', /*cors(),*/ async (req, res, next) => {
+app.get('/api/search', async (req, res, next) => {
   try {
     const {
       fromCity = '',
@@ -58,61 +54,13 @@ app.get('/api/search', /*cors(),*/ async (req, res, next) => {
       limit
     } = req.query
 
-    // Validate dates
-    if (!utils.validDate(startDate)) {
-      throw new Error('Invalid start date:', startDate)
-    }
-    if (!utils.validDate(endDate)) {
-      throw new Error('Invalid end date:', endDate)
-    }
-    if (endDate < startDate) {
-      throw new Error(`Invalid date range for search: ${startDate} -> ${endDate}`)
-    }
-
-    let query = 'SELECT * FROM awards WHERE '
-    const params = []
-
-    // Add cities
-    const cities = [ fromCity.toUpperCase(), toCity.toUpperCase() ]
-    if (direction === 'oneway') {
-      query += 'fromCity = ? AND toCity = ?'
-      params.push(...cities)
-    } else if (direction === 'roundtrip') {
-      query += '((fromCity = ? AND toCity = ?) OR (toCity = ? AND fromCity = ?))'
-      params.push(...cities, ...cities)
-    } else {
-      throw new Error('Unrecognized direction parameter:', direction)
-    }
-
-    // Add dates
-    query += ' AND date BETWEEN ? AND ?'
-    params.push(startDate, endDate)
-
-    // Add quantity
-    query += ' AND quantity >= ?'
-    params.push(parseInt(quantity))
-
-    // Add cabins
-    if (cabin) {
-      const values = cabin.split(',')
-      query += ` AND cabin IN (${values.map(x => '?').join(',')})`
-      values.forEach(x => params.push(x))
-    }
-
-    // Add limit
-    if (limit) {
-      query += ' LIMIT ?'
-      params.push(parseInt(limit))
-    }
-
-    // Run SQL query
     console.time('search')
-    let awards = db.db().prepare(query).all(...params)
+
+    let awards = await db.doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit);
 
     // Fetch segments for each award
-    const stmt = db.db().prepare('SELECT * FROM segments WHERE awardId = ?')
     for (const award of awards) {
-      award.segments = stmt.all(award.id)
+      award.segments = await db.getSegments(award.id)
     }
     console.timeEnd('search')
 
@@ -125,8 +73,6 @@ app.get('/api/search', /*cors(),*/ async (req, res, next) => {
 const main = async () => {
   try {
     // Open database
-    console.log('Migrating database (if necessary)...')
-    db.migrate()
     console.log('Opening database...')
     db.open()
 

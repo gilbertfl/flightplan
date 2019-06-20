@@ -315,8 +315,8 @@ const main = async (args) => {
     }
 
     // Create database if necessary, and then open
-    db.migrate()
-    db.open()
+    //db.migrate()
+    await db.open()
 
     // Setup engine options
     const options = { headless, proxy, docker }
@@ -393,13 +393,13 @@ const main = async (args) => {
       }
 
       // Write request and awards (if parsed) to database
-      const requestId = helpers.saveRequest(results)
+      const requestId = await helpers.saveRequest(results);
       if (awards) {
         if (awards.length > 0) {
           daysRemaining = terminate // Reset termination counter
         }
         const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
-        helpers.saveAwards(requestId, awards, placeholders)
+        await helpers.saveAwards(requestId, awards, placeholders)
       }
     }
     if (skipped > 0) {

@@ -1,174 +1,571 @@
-const Database = require('better-sqlite3')
-const fs = require('fs')
-const path = require('path')
-const rimraf = require('rimraf')
-
+const sql = require('mssql')
+const util = require('util')
 const paths = require('./paths')
-const prompts = require('../shared/prompts')
+const utils = require('../src/utils')
 
-let _db = null
+let _pool = null;
 
-function db () {
-  return _db
-}
 
-function open () {
-  if (!_db) {
-    console.log(`Attempting to open database: ${paths.database}`)
-    _db = new Database(paths.database)
+// Create connection to database
+var connectionConfig =
+{
+  user: paths.databaseUser, 
+  password: paths.databasePassword, 
+  server: paths.database, 
+  database: paths.databaseName, 
+  encrypt: true, 
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000
   }
-  return _db
+};
+
+async function open () {
+  if (!_pool) {
+    console.log(`Attempting to open database pool: ${paths.database}`);
+    //_pool = await sql.connect(connectionConfig);
+    _pool = new sql.ConnectionPool(connectionConfig);
+    await _pool.connect();
+
+    _pool.on('error', err => {
+      console.error(err);
+    })
+  }
+
+  return _pool;
 }
 
-function detectOldVersion () {
-  let db = null
-  try {
-    db = new Database(paths.database)
-    return !!db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='awards_requests'`).get()
-  } finally {
-    if (db) {
-      db.close()
-    }
+async function getRequestsWithoutAwards(engine, force) {
+  // Select only those requests without corresponding entries in awards table
+  let sql = force
+    ? 'SELECT * FROM requests'
+    : 'SELECT requests.* FROM requests LEFT JOIN awards ON requests.id = awards.requestId WHERE requestId IS NULL';
+  if (engine) {
+    sql += `${force ? ' WHERE' : ' AND'} requests.engine = @engine`;
+    return await _pool.request().input('engine').query(sql);
+  } else {
+    return await _pool.request().query(sql);
   }
 }
 
-function migrate () {
-  if (fs.existsSync(paths.database)) {
-    let migrationNeeded = false
-    if (detectOldVersion()) {
-      if (prompts.askYesNo(`
-ERROR: An older version database was detected, that is incompatible with this version of Flightplan.
+async function getRequestsForOW(route) {
+  
+  // Format dates
+  const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
+  const departStr = departDate || null
 
-Would you like to convert it to the newer format? (WARNING: All search and award data will be deleted!)`)) {
-        fs.unlinkSync(paths.database)
-        rimraf.sync(paths.data)
-        migrationNeeded = true
+  var result = await _pool.request()
+    .input('engine', sql.VarChar, engine)
+    .input('partners', sql.Bit, partners ? 1 : 0)
+    .input('cabin', sql.VarChar, cabin)
+    .input('quantity', sql.Int, quantity)
+    .input('fromCity', sql.VarChar, fromCity)
+    .input('toCity', sql.VarChar, toCity)
+    .input('departStr', sql.VarChar, departStr)
+    .query('SELECT * FROM requests WHERE ' +
+        'engine = @engine AND partners = @partners AND cabin = @cabin AND quantity = @quantity AND (' +
+        '(fromCity = @fromCity AND toCity = @toCity AND departDate = @departStr) OR ' +
+        '(fromCity = @toCity AND toCity = @fromCity AND returnDate = @departStr))');
+
+  return result.recordset;
+}
+
+async function getRequestsForRT(route) {
+  // Format dates
+  const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
+  const departStr = departDate || null
+  const returnStr = returnDate || null
+
+  var result = await _pool.request()
+    .input('engine', sql.VarChar, engine)
+    .input('partners', sql.Bit, partners ? 1 : 0)
+    .input('cabin', sql.VarChar, cabin)
+    .input('quantity', sql.Int, quantity)
+    .input('fromCity', sql.VarChar, fromCity)
+    .input('toCity', sql.VarChar, toCity)
+    .input('departStr', sql.VarChar, departStr)
+    .input('returnStr', sql.VarChar, returnStr)
+    .query('SELECT * FROM requests WHERE ' +
+    'engine = @engine AND partners = @partners AND cabin = @cabin AND quantity = @quantity AND (' +
+    '(fromCity = @fromCity AND toCity = @toCity AND (departDate = @departStr OR returnDate = @returnStr)) OR ' +
+    '(fromCity = @toCity AND toCity = @fromCity AND (departDate = @returnStr OR returnDate = @departStr)))');
+
+    return result.recordset;
+}
+
+async function getAwardsForRT(route) {
+  // Format dates
+  const { engine, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
+  const departStr = departDate || null
+  const returnStr = returnDate || null
+
+  var result = await _pool.request()
+    .input('engine', sql.VarChar, engine)
+    .input('cabin', sql.VarChar, cabin)
+    .input('quantity', sql.Int, quantity)
+    .input('fromCity', sql.VarChar, fromCity)
+    .input('toCity', sql.VarChar, toCity)
+    .input('departStr', sql.VarChar, departStr)
+    .input('returnStr', sql.VarChar, returnStr)
+    .query( 'SELECT * FROM awards WHERE ' +
+       'engine = @engine AND cabin = @cabin AND quantity <= @quantity AND (' +
+       '(fromCity = @fromCity AND toCity = @toCity AND date = @departStr) OR ' +
+       '(fromCity = @toCity AND toCity = @fromCity AND date = @returnStr))');
+
+  return result.recordset;
+}
+
+async function getAwardsForOW(route) {
+  // Format dates
+  const { engine, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
+  const departStr = departDate || null
+
+  var result = await _pool.request()
+    .input('engine', sql.VarChar, engine)
+    .input('cabin', sql.VarChar, cabin)
+    .input('quantity', sql.Int, quantity)
+    .input('fromCity', sql.VarChar, fromCity)
+    .input('toCity', sql.VarChar, toCity)
+    .input('departStr', sql.VarChar, departStr)
+    .query('SELECT * FROM awards WHERE ' +
+      'engine = @engine AND cabin = @cabin AND quantity <= @quantity AND ' +
+      'fromCity = @fromCity AND toCity = @toCity AND date = @departStr');
+
+  return result.recordset;
+}
+
+async function getAllRequests() {
+  var result = await _pool.request()
+    .query('SELECT * FROM requests');
+  return result.recordset;
+}
+
+async function getAllAwards() {
+  var result = await _pool.request()
+    .query('SELECT * FROM awards');
+  return result.recordset;
+}
+
+async function getSegments(awardId) {
+  var result = await _pool.request()
+    .input('awardId', sql.Int, awardId)
+    .query('SELECT * FROM segments WHERE awardId = @awardId');
+  return result.recordset;
+}
+
+async function cleanupRequest(requestId) {
+  var result = await _pool.request()
+    .input('requestId', sql.Int, requestId)
+    .query('DELETE FROM requests WHERE id = @requestId');
+  return result.recordset;
+}
+
+async function getRequest(requestId) {
+  var result = await _pool.request()
+    .input('requestId', sql.Int, requestId)
+    .query('SELECT * FROM requests WHERE id = @requestId');
+  return result.recordset;
+}
+
+async function cleanupAwards(awards) {
+  const transaction = _pool.transaction();
+
+  transaction.begin(async transactionBeginErr => {
+    if (transactionBeginErr) {
+      console.error("save segment transaction failed to begin.", transactionBeginErr);
+    } else {
+      try {
+        for (const award of awards) {
+          await transaction.request()
+            .input('awardId', sql.Int, award.id)
+            .query('DELETE FROM segments WHERE awardId = @awardId');
+          await transaction.request()
+            .input('awardId', sql.Int, award.id)
+            .query('DELETE FROM awards WHERE id = @awardId');
+        }
+        
+        transaction.commit(commitErr => {
+          if (commitErr) {
+            console.error("transaction commit failed, rolling back.", commitErr);
+            transaction.rollback(rollbackErr => {
+              if (rollbackErr) {
+                console.error("Cleanup awards failed, and failed to roll back!", rollbackErr);
+              } else {
+                console.error("Cleanup awards failed, successfully rolled back.");
+              }
+            });
+          } 
+        });
+
+      } catch (e) {
+        console.error("Unhandled exception while saving segment.", e);
+        transaction.rollback(err => {
+          console.error("Unable to roll back on error during sql transaction!");
+        });
       }
     }
-    if (!migrationNeeded) {
-      return
+  });
+}
+
+function doSaveSegment(transaction, awardId, position, row, resolve, reject) {
+  transaction.begin(transactionBeginErr => {
+    if (transactionBeginErr) {
+      console.error("save segment transaction failed to begin.", transactionBeginErr);
+    } else {
+      try {
+        transaction.request()
+            .input('awardId', sql.Int, awardId)
+            .input('position', sql.Int, position)
+            .input('airline', sql.VarChar, row.airline)
+            .input('flight', sql.VarChar, row.flight)
+            .input('aircraft', sql.VarChar, row.aircraft)
+            .input('fromCity', sql.VarChar, row.fromCity)
+            .input('toCity', sql.VarChar, row.toCity)
+            .input('date', sql.VarChar, row.date)
+            .input('departure', sql.VarChar, row.departure)
+            .input('arrival', sql.VarChar, row.arrival)
+            .input('duration', sql.Int, row.duration)
+            .input('nextConnection', sql.Int, row.nextConnection)
+            .input('cabin', sql.VarChar, row.cabin)
+            .input('stops', sql.Int, row.stops)
+            .input('lagDays', sql.Int, row.lagDays)
+            .input('bookingCode', sql.VarChar, row.bookingCode)
+            .query('INSERT segments (awardId, position, airline, flight, aircraft, fromCity, toCity, date, departure, arrival, duration, nextConnection, cabin, stops, lagDays, bookingCode) OUTPUT INSERTED.id ' + 
+                    'VALUES (@awardId, @position, @airline, @flight, @aircraft, @fromCity, @toCity, @date, @departure, @arrival, @duration, @nextConnection, @cabin, @stops, @lagDays, @bookingCode)', (err, result) => {
+              if (err) {
+                console.error("query failed", err);
+                transaction.rollback(rollbackErr => {
+                  if (rollbackErr) {
+                    console.error("Save request failed, and failed to roll back!", rollbackErr);
+                  } else {
+                    console.error("Save request failed, successfully rolled back.");
+                  }
+                  reject(err);
+                });
+              } else {
+                transaction.commit(commitErr => {
+                  if (commitErr) {
+                    console.error("transaction commit failed, rolling back.", commitErr);
+                    transaction.rollback(rollbackErr => {
+                      if (rollbackErr) {
+                        console.error("Save request failed, and failed to roll back!", rollbackErr);
+                      } else {
+                        console.error("Save request failed, successfully rolled back.");
+                      }
+                      reject(commitErr);
+                    });
+                  } else {
+                    var insertedRecordId = result.recordset[0].id;
+                    resolve(insertedRecordId);
+                  }
+                });
+              }
+            });
+      } catch (e) {
+        console.error("Unhandled exception while saving segment.", e);
+        transaction.rollback(err => {
+          console.error("Unable to roll back on error during sql transaction!");
+        });
+      }
+    }
+  });
+}
+doSaveSegment[util.promisify.custom] = (transaction, awardId, position, row) => {
+  return new Promise((resolve, reject) => {
+    doSaveSegment(transaction, awardId, position, row, resolve, reject);
+  });
+};
+async function saveSegment(awardId, position, row) {
+  var promisifiedSaveSegment = util.promisify(doSaveSegment);
+  return await promisifiedSaveSegment(_pool.transaction(), awardId, position, row);
+}
+
+function doSaveRequest(transaction, row, resolve, reject) {
+  transaction.begin(transactionBeginErr => {
+    if (transactionBeginErr) {
+      console.error("save request transaction failed to begin.", transactionBeginErr);
+      reject(transactionBeginErr);
+    } else {
+      try {
+        transaction.request()
+          .input('engine', sql.VarChar, row.engine)
+          .input('partners', sql.Bit, row.partners ? 1 : 0)
+          .input('cabin', sql.VarChar, row.cabin)
+          .input('quantity', sql.Int, row.quantity)
+          .input('fromCity', sql.VarChar, row.fromCity)
+          .input('toCity', sql.VarChar, row.toCity)
+          .input('departStr', sql.VarChar, row.departDate)
+          .input('returnStr', sql.VarChar, row.returnDate)
+          .input('assets', sql.VarChar, row.assets)
+          .query('INSERT requests (engine,partners,fromCity,toCity,departDate,returnDate,cabin,quantity,assets) OUTPUT INSERTED.id ' + 
+                  'VALUES (@engine, @partners, @fromCity, @toCity, @departStr, @returnStr, @cabin, @quantity, @assets)', (err, result) => {
+            if (err) {
+              console.error("query failed", err);
+              transaction.rollback(rollbackErr => {
+                if (rollbackErr) {
+                  console.error("Save request failed, and failed to roll back!", rollbackErr);
+                } else {
+                  console.error("Save request failed, successfully rolled back.");
+                }
+                reject(err);
+              });
+            } else {
+              transaction.commit(commitErr => {
+                if (commitErr) {
+                  console.error("transaction commit failed, rolling back.", commitErr);
+                  transaction.rollback(rollbackErr => {
+                    if (rollbackErr) {
+                      console.error("Save request failed, and failed to roll back!", rollbackErr);
+                    } else {
+                      console.error("Save request failed, successfully rolled back.");
+                    }
+                    reject(commitErr);
+                  });
+                } else {
+                  var insertedRecordId = result.recordset[0].id;
+                  resolve(insertedRecordId);
+                }
+              });
+            }
+          });
+      } catch (e) {
+        console.error("Unhandled exception while saving request.", e);
+        //success = false;
+        transaction.rollback(rollbackErr => {
+          if (rollbackErr) {
+            console.error("Save request failed, and failed to roll back!", rollbackErr);
+          } else {
+            console.error("Save request failed, successfully rolled back.");
+          }
+          reject(e);
+        });
+      } 
+    }
+  });
+}
+doSaveRequest[util.promisify.custom] = (transaction, row) => {
+  return new Promise((resolve, reject) => {
+    doSaveRequest(transaction, row, resolve, reject);
+  });
+};
+async function saveRequest(row) {
+  var promisifiedSaveRequest = util.promisify(doSaveRequest);
+  return await promisifiedSaveRequest(_pool.transaction(), row);
+}
+
+
+function doSaveAward(transaction, requestId, row, resolve, reject) {
+    transaction.begin(transactionBeginErr => {
+      if (transactionBeginErr) {
+        console.error("Save awards transaction failed to begin, rolling back.", transactionBeginErr);
+        transaction.rollback(rollbackErr => {
+          if (rollbackErr) {
+            console.error("Could not roll back!", rollbackErr);
+          }
+        });
+        reject(transactionBeginErr);
+      } else {
+        try {
+          const { segments } = row;
+          delete row.segments;
+
+          transaction.request()
+            .input('requestId', sql.Int, requestId)
+            .input('engine', sql.VarChar, row.engine)
+            .input('partner', sql.Bit, row.partner ? 1 : 0)
+            .input('fromCity', sql.VarChar, row.fromCity)
+            .input('toCity', sql.VarChar, row.toCity)
+            .input('date', sql.VarChar, row.date)
+            .input('cabin', sql.VarChar, row.cabin)
+            .input('mixed', sql.Bit, row.mixed)
+            .input('duration', sql.Int, row.duration)
+            .input('stops', sql.Int, row.stops)
+            .input('quantity', sql.Int, row.quantity)
+            .input('mileage', sql.Int, row.mileage)
+            .input('fees', sql.VarChar, row.fees)
+            .input('fares', sql.VarChar, row.fares)
+            .query('INSERT awards (requestId,engine,partner,fromCity,toCity,date,cabin,mixed,duration,stops,quantity,mileage,fees,fares) OUTPUT INSERTED.id ' + 
+              'VALUES (@requestId, @engine, @partner, @fromCity, @toCity, @date, @cabin, @mixed, @duration, @stops, @quantity, @mileage, @fees, @fares)', (err, result) => {
+                if (err) {
+                  console.error("Save award query failed", err);
+                  transaction.rollback(rollbackErr => {
+                    if (rollbackErr) {
+                      console.error("Save award failed, and failed to roll back!", rollbackErr);
+                    } else {
+                      console.error("Save award failed, successfully rolled back.");
+                    }
+                  });
+                  reject(err);
+                } else {
+                  const awardId = result.recordset[0].id;
+
+                  // for now, commit each award separately
+                  transaction.commit(commitErr => {
+                    if (commitErr) {
+                      console.error("transaction commit failed, rolling back.", commitErr);
+                      transaction.rollback(rollbackErr => {
+                        if (rollbackErr) {
+                          console.error("Could not roll back!", rollbackErr);
+                        }
+                      });
+                      reject(commitErr);
+                    } 
+                  });
+
+                  // Now add each segment
+                  // TODO: actually wait until transaction is committed to awards before doing this!!
+                  if (segments) {
+                    // TODO: use better javascript skills to do this!!
+                    var segmentsArray = [];
+                    segments.forEach((segment, position) => {
+                      segmentsArray.push({
+                        segment: segment, 
+                        awardId: awardId
+                      });
+                    })
+                    resolve(segmentsArray);
+                  } else {
+                    resolve(null);
+                  }
+                } 
+              });
+        } catch (e) {
+          console.error("unhandled exception while saving awards, rolling back.", e);
+          transaction.rollback(rollbackErr => {
+            if (rollbackErr) {
+              console.error("unhandled exception, and could not roll back!", rollbackErr);
+            }
+          });
+          reject(e);
+        }
+      }
+    });
+  
+}
+doSaveAward[util.promisify.custom] = (pool, requestId, row) => {
+  return new Promise((resolve, reject) => {
+    const transaction = pool.transaction();
+    doSaveAward(transaction, requestId, row, resolve, reject);
+  });
+};
+async function saveAwards(requestId, rows) {
+  var promisifiedSaveAward = util.promisify(doSaveAward);
+  for (const row of rows) {
+    // if saving fails, promise is rejected and an exception *should* be thrown
+    var segments = await promisifiedSaveAward(_pool, requestId, row);
+    if (segments) {
+      for (let i=0; i<segments.length; i++) {
+        await saveSegment(segments[i].awardId, i, segments[i].segment);
+      }
     }
   }
-  console.log('Creating database...')
+}
 
-  // Create database directory if missing
-  const dir = path.dirname(paths.database)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir)
+async function doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit) {
+
+  // Validate dates
+  if (!utils.validDate(startDate)) {
+    throw new Error('Invalid start date:', startDate);
+  }
+  if (!utils.validDate(endDate)) {
+    throw new Error('Invalid end date:', endDate);
+  }
+  if (endDate < startDate) {
+    throw new Error(`Invalid date range for search: ${startDate} -> ${endDate}`);
   }
 
-  // Create the database, and tables
-  try {
-    _db = open()
-    createTable('requests', [
-      'id INTEGER PRIMARY KEY ASC',
-      'engine TEXT NOT NULL',
-      'partners BOOLEAN NOT NULL',
-      'fromCity TEXT NOT NULL',
-      'toCity TEXT NOT NULL',
-      'departDate TEXT NOT NULL',
-      'returnDate TEXT',
-      'cabin TEXT',
-      'quantity INTEGER DEFAULT 0',
-      'assets TEXT NOT NULL',
-      'updatedAt TEXT DEFAULT CURRENT_TIMESTAMP'
-    ])
-    createTable('awards', [
-      'id INTEGER PRIMARY KEY ASC',
-      'requestId INTEGER',
-      'engine TEXT NOT NULL',
-      'partner BOOLEAN NOT NULL',
-      'fromCity TEXT NOT NULL',
-      'toCity TEXT NOT NULL',
-      'date TEXT NOT NULL',
-      'cabin TEXT NOT NULL',
-      'mixed BOOLEAN NOT NULL',
-      'duration INTEGER',
-      'stops INTEGER DEFAULT 0',
-      'quantity INTEGER DEFAULT 1',
-      'mileage INTEGER',
-      'fees TEXT',
-      'fares TEXT',
-      'updated_at TEXT DEFAULT CURRENT_TIMESTAMP'
-    ])
-    createTable('segments', [
-      'id INTEGER PRIMARY KEY ASC',
-      'awardId INTEGER',
-      'position INTEGER NOT NULL',
-      'airline TEXT NOT NULL',
-      'flight TEXT NOT NULL',
-      'aircraft TEXT',
-      'fromCity TEXT NOT NULL',
-      'toCity TEXT NOT NULL',
-      'date TEXT NOT NULL',
-      'departure TEXT NOT NULL',
-      'arrival TEXT NOT NULL',
-      'duration INTEGER',
-      'nextConnection INTEGER',
-      'cabin TEXT',
-      'stops INTEGER DEFAULT 0',
-      'lagDays INTEGER DEFAULT 0',
-      'bookingCode TEXT',
-      'updated_at TEXT DEFAULT CURRENT_TIMESTAMP'
-    ])
-  } catch (err) {
-    throw new Error(`Database migration failed: ${err.message}`)
+  var request = _pool.request();
+  let query = 'SELECT * FROM awards WHERE ';
+
+  // Add cities
+  if (direction === 'oneway') {
+    query += 'fromCity = @fromCity AND toCity = @toCity';
+  } else if (direction === 'roundtrip') {
+    query += '((fromCity = @fromCity AND toCity = @toCity) OR (toCity = @fromCity AND fromCity = @toCity))';
+  } else {
+    throw new Error('Unrecognized direction parameter:', direction);
+  }
+  request = request.input('fromCity', sql.VarChar, fromCity.toUpperCase());
+  request = request.input('toCity', sql.VarChar, toCity.toUpperCase());
+
+  // Add dates
+  query += ' AND date BETWEEN @startDate AND @endDate';
+  request = request.input('startDate', sql.VarChar, startDate);
+  request = request.input('endDate', sql.VarChar, endDate);
+
+  // Add quantity
+  query += ' AND quantity >= @quantity';
+  request = request.input('quantity', sql.Int, quantity);
+
+  // Add cabins
+  if (cabin) {
+    const values = cabin.split(',');
+    //query += ` AND cabin IN (${values.map(x => '?').join(',')})`;
+    //values.forEach(x => params.push(x));
+
+    // TODO: parameterize this 'IN' query!
+    query += ` AND cabin IN (${values.map(x => `'${x}'`)})`;
+  }
+
+  // Add limit
+  if (limit) {
+    query += ' LIMIT @resultLimit';
+    request = request.input('resultLimit', sql.Int, limit);
+  }
+
+  // Run SQL query
+  var awards = await request.query(query);
+
+  return awards.recordset;
+}
+
+async function getAllRequestsForEngine(engine) {
+  let sql = `SELECT * FROM requests`;
+  if (engine) {
+    sql += ' WHERE engine = @engine';
+    return await _pool.request().input('engine', sql.VarChar, engine).query(sql);
+  } else {
+    return await _pool.request().query(sql);
   }
 }
 
-function createTable (tableName, columns) {
-  return _db.prepare(`CREATE TABLE ${tableName} (${columns.join(',')})`).run()
-}
-
-function insertRow (table, row) {
-  const entries = Object.entries(row)
-  const colNames = entries.map(x => x[0])
-  const colVals = entries.map(x => coerceType(x[1]))
-  const sql = `INSERT INTO ${table} (${colNames.join(',')}) VALUES (${colVals.map(x => '?').join(',')})`
-  return _db.prepare(sql).run(...colVals)
-}
-
-function coerceType (val) {
-  if (typeof val === 'boolean') {
-    return val ? 1 : 0
+async function getAllAwardsForEngine(engine) {
+  let sql = `SELECT * FROM awards`;
+  if (engine) {
+    sql += ' WHERE engine = @engine';
+    return await _pool.request().input('engine', sql.VarChar, engine).query(sql);
+  } else {
+    return await _pool.request().query(sql);
   }
-  return val
-}
-
-function count (table) {
-  const result = _db.prepare(`SELECT count(*) FROM ${table}`).get()
-  return result ? result['count(*)'] : undefined
 }
 
 function close () {
-  if (_db) {
-    _db.close()
-    _db = null
+  if (_pool) {
+    _pool.close();
+    _pool = null
   }
 }
 
-function begin () {
-  _db.prepare('BEGIN').run()
-}
-
-function commit () {
-  _db.prepare('COMMIT').run()
-}
-
-function rollback () {
-  _db.prepare('ROLLBACK').run()
-}
 
 module.exports = {
-  db,
+  getAllRequests, 
+  getRequestsForRT, 
+  getRequestsForOW, 
+  getRequestsWithoutAwards, 
+  getAllRequestsForEngine, 
+  getRequest, 
+  getSegments, 
+  getAllAwards, 
+  getAllAwardsForEngine, 
+  getAwardsForRT,
+  getAwardsForOW, 
   open,
-  migrate,
-  createTable,
-  insertRow,
-  coerceType,
-  count,
-  close,
-  begin,
-  commit,
-  rollback
+  saveAwards, 
+  saveSegment, 
+  saveRequest, 
+  cleanupRequest,
+  cleanupAwards, 
+  doSearch, 
+  close 
 }
