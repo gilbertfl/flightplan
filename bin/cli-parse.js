@@ -14,23 +14,8 @@ program
   .option('--force', 'Re-parse requests, even if they have already been parsed previously')
   .parse(process.argv)
 
-function getRequests (engine, force) {
-
-  throw new exception("getRequests not moved to db class");
-
-  const bind = []
-
-  // Select only those requests without corresponding entries in awards table
-  let sql = force
-    ? 'SELECT * FROM requests'
-    : 'SELECT requests.* FROM requests LEFT JOIN awards ON requests.id = awards.requestId WHERE requestId IS NULL'
-  if (engine) {
-    sql += `${force ? ' WHERE' : ' AND'} requests.engine = ?`
-    bind.push(engine)
-  }
-
-  // Evaluate the SQL
-  return db.db().prepare(sql).all(...bind)
+async function getRequests (engine, force) {
+  return await db.getRequestsWithoutAwards(engine, force);
 }
 
 const main = async (args) => {
@@ -46,7 +31,7 @@ const main = async (args) => {
     // Iterate over search requests
     logger.info('Parsing search requests...')
     const failed = []
-    for (const row of getRequests(args.website, force)) {
+    for (const row of await getRequests(args.website, force)) {
       // First delete all awards associated with this request
       const oldAwards = await db.getRequest(row.id);
       helpers.cleanupAwards(oldAwards)

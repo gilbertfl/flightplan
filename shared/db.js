@@ -36,6 +36,19 @@ async function open () {
   return _pool;
 }
 
+async function getRequestsWithoutAwards(engine, force) {
+  // Select only those requests without corresponding entries in awards table
+  let sql = force
+    ? 'SELECT * FROM requests'
+    : 'SELECT requests.* FROM requests LEFT JOIN awards ON requests.id = awards.requestId WHERE requestId IS NULL';
+  if (engine) {
+    sql += `${force ? ' WHERE' : ' AND'} requests.engine = @engine`;
+    return await _pool.request().input('engine').query(sql);
+  } else {
+    return await _pool.request().query(sql);
+  }
+}
+
 async function getRequestsForOW(route) {
   
   // Format dates
@@ -463,20 +476,12 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
   }
 
   var request = _pool.request();
-    //.input('requestId', sql.Int, requestId);
-
   let query = 'SELECT * FROM awards WHERE ';
-  //const params = [];
 
   // Add cities
-  //const cities = [ fromCity.toUpperCase(), toCity.toUpperCase() ];
   if (direction === 'oneway') {
-    //query += 'fromCity = ? AND toCity = ?';
-    //params.push(...cities);
     query += 'fromCity = @fromCity AND toCity = @toCity';
   } else if (direction === 'roundtrip') {
-    //query += '((fromCity = ? AND toCity = ?) OR (toCity = ? AND fromCity = ?))';
-    //params.push(...cities, ...cities);
     query += '((fromCity = @fromCity AND toCity = @toCity) OR (toCity = @fromCity AND fromCity = @toCity))';
   } else {
     throw new Error('Unrecognized direction parameter:', direction);
@@ -485,15 +490,11 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
   request = request.input('toCity', sql.VarChar, toCity.toUpperCase());
 
   // Add dates
-  //query += ' AND date BETWEEN ? AND ?';
-  //params.push(startDate, endDate);
   query += ' AND date BETWEEN @startDate AND @endDate';
   request = request.input('startDate', sql.VarChar, startDate);
   request = request.input('endDate', sql.VarChar, endDate);
 
   // Add quantity
-  //query += ' AND quantity >= ?';
-  //params.push(parseInt(quantity));
   query += ' AND quantity >= @quantity';
   request = request.input('quantity', sql.Int, quantity);
 
@@ -509,17 +510,34 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
 
   // Add limit
   if (limit) {
-    //query += ' LIMIT ?';
-    //params.push(parseInt(limit));
     query += ' LIMIT @resultLimit';
     request = request.input('resultLimit', sql.Int, limit);
   }
 
   // Run SQL query
-  //let awards = db.db().prepare(query).all(...params);
   var awards = await request.query(query);
 
   return awards.recordset;
+}
+
+async function getAllRequestsForEngine(engine) {
+  let sql = `SELECT * FROM requests`;
+  if (engine) {
+    sql += ' WHERE engine = @engine';
+    return await _pool.request().input('engine', sql.VarChar, engine).query(sql);
+  } else {
+    return await _pool.request().query(sql);
+  }
+}
+
+async function getAllAwardsForEngine(engine) {
+  let sql = `SELECT * FROM awards`;
+  if (engine) {
+    sql += ' WHERE engine = @engine';
+    return await _pool.request().input('engine', sql.VarChar, engine).query(sql);
+  } else {
+    return await _pool.request().query(sql);
+  }
 }
 
 function close () {
@@ -534,9 +552,12 @@ module.exports = {
   getAllRequests, 
   getRequestsForRT, 
   getRequestsForOW, 
+  getRequestsWithoutAwards, 
+  getAllRequestsForEngine, 
   getRequest, 
   getSegments, 
   getAllAwards, 
+  getAllAwardsForEngine, 
   getAwardsForRT,
   getAwardsForOW, 
   open,
