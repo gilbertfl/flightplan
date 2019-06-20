@@ -382,7 +382,7 @@ function doSaveAward(transaction, requestId, row, resolve, reject) {
             .input('duration', sql.Int, row.duration)
             .input('stops', sql.Int, row.stops)
             .input('quantity', sql.Int, row.quantity)
-            .input('mileage', sql.Int, row.mileage)
+            .input('mileage', sql.Float, row.mileage)
             .input('fees', sql.VarChar, row.fees)
             .input('fares', sql.VarChar, row.fares)
             .query('INSERT awards (requestId,engine,partner,fromCity,toCity,date,cabin,mixed,duration,stops,quantity,mileage,fees,fares) OUTPUT INSERTED.id ' + 

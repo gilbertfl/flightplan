@@ -25,7 +25,7 @@ CREATE TABLE awards (
     [duration] int, 
     [stops] int default 0, 
     [quantity] int default 1, 
-    [mileage] int, 
+    [mileage] float, 
     [fees] varchar(255), 
     [fares] varchar(255), 
     [updated_at] datetime default CURRENT_TIMESTAMP
