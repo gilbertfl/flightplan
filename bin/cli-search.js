@@ -315,7 +315,7 @@ const main = async (args) => {
     }
 
     // Create database if necessary, and then open
-    //db.migrate()
+    await db.migrate()
     await db.open()
 
     // Setup engine options

@@ -540,13 +540,16 @@ async function getAllAwardsForEngine(engine) {
   }
 }
 
+async function migrate() {
+  // TODO (if desired): implement some kind of sqllite migration
+}
+
 function close () {
   if (_pool) {
     _pool.close();
     _pool = null
   }
 }
-
 
 module.exports = {
   getAllRequests, 
@@ -567,5 +570,6 @@ module.exports = {
   cleanupRequest,
   cleanupAwards, 
   doSearch, 
-  close 
+  close, 
+  migrate
 }
