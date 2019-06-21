@@ -56,12 +56,8 @@ app.get('/api/search', async (req, res, next) => {
 
     console.time('search')
 
-    let awards = await db.doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit);
+    let awards = await db.doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit)
 
-    // Fetch segments for each award
-    for (const award of awards) {
-      award.segments = await db.getSegments(award.id)
-    }
     console.timeEnd('search')
 
     res.send(awards)

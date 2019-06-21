@@ -475,28 +475,34 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
     throw new Error(`Invalid date range for search: ${startDate} -> ${endDate}`);
   }
 
-  var request = _pool.request();
-  let query = 'SELECT * FROM awards WHERE ';
+  var awardsRequest = _pool.request();
+  var segmentsRequest = _pool.request();
+  let query = ' WHERE ';
 
   // Add cities
   if (direction === 'oneway') {
-    query += 'fromCity = @fromCity AND toCity = @toCity';
+    query += 'a.fromCity = @fromCity AND a.toCity = @toCity';
   } else if (direction === 'roundtrip') {
-    query += '((fromCity = @fromCity AND toCity = @toCity) OR (toCity = @fromCity AND fromCity = @toCity))';
+    query += '((a.fromCity = @fromCity AND a.toCity = @toCity) OR (a.toCity = @fromCity AND a.fromCity = @toCity))';
   } else {
     throw new Error('Unrecognized direction parameter:', direction);
   }
-  request = request.input('fromCity', sql.VarChar, fromCity.toUpperCase());
-  request = request.input('toCity', sql.VarChar, toCity.toUpperCase());
+  awardsRequest = awardsRequest.input('fromCity', sql.VarChar, fromCity.toUpperCase());
+  awardsRequest = awardsRequest.input('toCity', sql.VarChar, toCity.toUpperCase());
+  segmentsRequest = segmentsRequest.input('fromCity', sql.VarChar, fromCity.toUpperCase());
+  segmentsRequest = segmentsRequest.input('toCity', sql.VarChar, toCity.toUpperCase());
 
   // Add dates
-  query += ' AND date BETWEEN @startDate AND @endDate';
-  request = request.input('startDate', sql.VarChar, startDate);
-  request = request.input('endDate', sql.VarChar, endDate);
+  query += ' AND a.date BETWEEN @startDate AND @endDate';
+  awardsRequest = awardsRequest.input('startDate', sql.VarChar, startDate);
+  awardsRequest = awardsRequest.input('endDate', sql.VarChar, endDate);
+  segmentsRequest = segmentsRequest.input('startDate', sql.VarChar, startDate);
+  segmentsRequest = segmentsRequest.input('endDate', sql.VarChar, endDate);
 
   // Add quantity
-  query += ' AND quantity >= @quantity';
-  request = request.input('quantity', sql.Int, quantity);
+  query += ' AND a.quantity >= @quantity';
+  awardsRequest = awardsRequest.input('quantity', sql.Int, quantity);
+  segmentsRequest = segmentsRequest.input('quantity', sql.Int, quantity);
 
   // Add cabins
   if (cabin) {
@@ -505,19 +511,37 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
     //values.forEach(x => params.push(x));
 
     // TODO: parameterize this 'IN' query!
-    query += ` AND cabin IN (${values.map(x => `'${x}'`)})`;
+    query += ` AND a.cabin IN (${values.map(x => `'${x}'`)})`;
   }
 
   // Add limit
   if (limit) {
     query += ' LIMIT @resultLimit';
-    request = request.input('resultLimit', sql.Int, limit);
+    awardsRequest = awardsRequest.input('resultLimit', sql.Int, limit);
+    segmentsRequest = segmentsRequest.input('resultLimit', sql.Int, limit);
   }
 
   // Run SQL query
-  var awards = await request.query(query);
+  const awardQuery = 'SELECT a.* FROM awards as a ' + query;
+  var awardsResult = await awardsRequest.query(awardQuery);
 
-  return awards.recordset;
+  const segmentsQuery = 'SELECT s.* FROM awards as a JOIN segments as s ON (a.id = s.awardId) ' + query; 
+  var allSegmentsResult = await segmentsRequest.query(segmentsQuery)
+
+  var toReturn = awardsResult.recordset;
+  
+  // TODO: assemble all of this in SQL instead of code!!
+  for (var i=0; i<toReturn.length; i++) {
+    const segments = allSegmentsResult.recordset.filter(s => s.awardId == toReturn[i].id);
+    if (segments) {
+      toReturn[i].segments = segments;
+    } else {
+      // for now just put null tuple
+      toReturn[i].segments = [];
+    }
+  }
+
+  return toReturn;
 }
 
 async function getAllRequestsForEngine(engine) {
