@@ -55,7 +55,7 @@ module.exports = class extends Searcher {
     // Fill out the form
     if (oneWay) {
       await this.fillForm({
-        tripTypeOneWay: 'One-way',
+        tripTypeRoundTrip: 'One-way', // note: this is a bug in aeroplans DOM, they named both inputs the same...
         currentTripTab: 'oneway',
         city1FromOnewayCode: fromCity,
         city1ToOnewayCode: toCity,
