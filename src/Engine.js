@@ -55,7 +55,7 @@ class Engine {
       height = utils.randomInt(1400, 1440),
       proxy,
       throttle = true,
-      timeout = 90000,
+      timeout = 180000,
       verbose = true,
       cookies,
       evasions = {}

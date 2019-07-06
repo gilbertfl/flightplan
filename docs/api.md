@@ -230,7 +230,7 @@ An Engine is used to execute a flight award search. Each Engine instance is asso
     - `username` <[string]> Optional proxy username, if proxy requires authentication
     - `password` <[string]> optional proxy password, if proxy requires authentication
   - `throttle` <[boolean]> Turns throttling behavior on or off, defaults to `true`
-  - `timeout` <[boolean]> Timeout in milliseconds when waiting for pages or elements to load, defaults to `90000`
+  - `timeout` <[boolean]> Timeout in milliseconds when waiting for pages or elements to load, defaults to `180000`
   - `verbose` <[boolean]> Turns verbose logging on or off, defaults to `true`
   - `cookies` <[Array]<[Object]>> List of cookies to populate the Chromium instance, uses the same format as [engine.getCookies()](#engine-getcookies)
 - returns: <[Promise]>
