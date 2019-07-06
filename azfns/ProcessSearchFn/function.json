@@ -6,7 +6,7 @@
       "type": "serviceBusTrigger",
       "direction": "in",
       "queueName": "test1",
-      "connection": "p2bauer-flightplan-queue_SERVICEBUS"
+      "connection": "testConnection"
     }
   ]
 }

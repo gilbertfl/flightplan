@@ -19,9 +19,9 @@
     {
       "name": "outputSbQueue",
       "type": "serviceBus",
+      "direction": "out", 
       "queueName": "test1",
-      "connection": "p2bauer-flightplan-queue_SERVICEBUS", 
-      "direction": "out"
-  }
+      "connection": "testConnection"
+    }
   ]
 }

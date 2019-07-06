@@ -10,7 +10,7 @@ module.exports = async function (context, req) {
         // TODO: fill up the SB queue msg with all the stuff from the HTTP post (req)
         // NOTE: looks like so far JS only supports setting the message itself (no metadata?)
         //   https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-service-bus#output---javascript-example
-        context.outputSbQueue = req.body;
+        context.bindings.outputSbQueue = (req.query.name || req.body.name);
     }
     else {
         context.res = {
