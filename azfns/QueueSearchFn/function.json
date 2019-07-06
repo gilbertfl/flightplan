@@ -1,4 +1,5 @@
 {
+  "scriptFile": "index.js",
   "bindings": [
     {
       "authLevel": "function",
@@ -18,8 +19,8 @@
     {
       "name": "outputSbQueue",
       "type": "serviceBus",
-      "queueName": "testqueue",
-      "connection": "MyServiceBusConnection",
+      "queueName": "test1",
+      "connection": "p2bauer-flightplan-queue_SERVICEBUS", 
       "direction": "out"
   }
   ]

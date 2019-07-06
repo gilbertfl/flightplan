@@ -1,11 +1,12 @@
 {
+  "scriptFile": "index.js",
   "bindings": [
     {
       "name": "mySbMsg",
       "type": "serviceBusTrigger",
       "direction": "in",
-      "queueName": "myinputqueue",
-      "connection": ""
+      "queueName": "test1",
+      "connection": "p2bauer-flightplan-queue_SERVICEBUS"
     }
   ]
 }
