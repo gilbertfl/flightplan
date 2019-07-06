@@ -70,7 +70,7 @@ const main = async () => {
   try {
     // Open database
     console.log('Opening database...')
-    db.open()
+    await db.open()
 
     // Launch Express server
     console.log(`Running web server on port: ${port}`)

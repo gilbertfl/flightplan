@@ -26,7 +26,7 @@ const main = async (args) => {
   try {
     // Open the database
     logger.info('Opening database...')
-    db.open()
+    await db.open()
 
     // Iterate over search requests
     logger.info('Parsing search requests...')

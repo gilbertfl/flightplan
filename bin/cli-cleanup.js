@@ -149,7 +149,7 @@ const main = async (args) => {
   try {
     // Open the database
     console.log('Opening database...')
-    db.open()
+    await db.open()
 
     // Cleanup resources
     const { resources } = await cleanupResources(yes, verbose)
