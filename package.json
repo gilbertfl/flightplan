@@ -9,7 +9,7 @@
   "scripts": {
     "client": "cd client && yarn start",
     "server": "nodemon bin/cli-server.js",
-    "start": "nodemon bin/cli-server.js",
+    "start": "node bin/cli-server.js",
     "dev": "concurrently --kill-others-on-fail -p \"[{name}]\" -n \"CLIENT,SERVER\" -c \"black.bgBlue.bold,black.bgGreen.bold\" \"yarn client\" \"yarn server\"",
     "test": "jest"
   },
