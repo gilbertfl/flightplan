@@ -2,7 +2,7 @@
   "name": "FlightPlanFns",
   "version": "1.0",
   "description": "Azure functions to find availability headless in the cloud",
-  "scripts" : {
+  "scripts": {
     "test": "echo \"No tests yet...\""
   },
   "author": ""
