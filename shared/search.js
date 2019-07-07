@@ -16,19 +16,6 @@ const strategies = {
     nh: { roundtripOptimized: false }
 }
 
-function fatal (engine, message, err) {
-    if (typeof engine === 'string') {
-        err = message
-        message = engine
-        engine = null
-    }
-    engine ? engine.error(message) : logger.error(message)
-    if (err) {
-        console.error(err)
-    }
-    process.exit(1)
-}
-
 function generateQueries (args, engine, days) {
     const { start: startDate, end: endDate } = args
     const queries = []
@@ -164,7 +151,7 @@ function redundantSegment (routeMap, query) {
     return false
 }
 
-async function doSearch(args, credentialsOverride) {
+async function doSearch(args, credentialsOverride, handleExceptions = true) {
 
     const {
         start: startDate,
@@ -280,7 +267,18 @@ async function doSearch(args, credentialsOverride) {
         }
         logger.success('Search complete!')
     } catch (err) {
-        fatal('A fatal error occurred!', err)
+        if (typeof engine === 'string') {
+            err = message
+            message = engine
+            engine = null
+        }
+        engine ? engine.error(message) : logger.error(message)
+        if (err) {
+            console.error(err)
+        }
+        if (!handleExceptions) {
+            throw err;
+        }
     } finally {
         await engine.close()
         db.close()
