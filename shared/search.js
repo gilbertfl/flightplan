@@ -43,8 +43,8 @@ function generateQueries (args, engine, days) {
     const validEnd = engine.config.validDateRange()[1]
 
     // Compute cities coming from, and to
-    const departCities = { fromCity: args.from, toCity: args.to }
-    const returnCities = { fromCity: args.to, toCity: args.from }
+    const departCities = { fromCity: args.from.toUpperCase(), toCity: args.to.toUpperCase() }
+    const returnCities = { fromCity: args.to.toUpperCase(), toCity: args.from.toUpperCase() }
 
     // Compute the one-way segments coming back at beginning of search range
     for (let i = 0; i < gap; i++) {
