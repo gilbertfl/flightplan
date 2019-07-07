@@ -25,6 +25,7 @@ program
   .option('-a, --account <n>', `Index of account to use`, (x) => parseInt(x), 0)
   .option('-h, --headless', `Run Chrome in headless mode`)
   .option('-p, --proxy <server>', `Provide a proxy to use with Chome (server:port:user:pass)`)
+  .option('--remotechrome <wsurl>', `Provide a remote headless chrome url instead of local chromium (ws://url)`)
   .option('-d, --docker', `Enable flags to make allow execution in docker environment`)
   .option('-P, --no-parser', `Do not parse search results`)
   .option('-r, --reverse', `Run queries in reverse chronological order`)

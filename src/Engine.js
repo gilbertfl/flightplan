@@ -58,7 +58,8 @@ class Engine {
       timeout = 180000,
       verbose = true,
       cookies,
-      evasions = {}
+      evasions = {}, 
+      remotechrome = ""
     } = options
 
     // Save options
@@ -79,7 +80,7 @@ class Engine {
     }
 
     // Setup browser and new page
-    this._state.browser = await this._newBrowser()
+    this._state.browser = await this._newBrowser(remotechrome)
     const page = (await this._state.browser.pages())[0]
     this._state.page = await this._newPage(page)
 
@@ -173,7 +174,7 @@ class Engine {
     this._state.page = newPage
   }
 
-  async _newBrowser () {
+  async _newBrowser (remoteAddress = "") {
     // Create a new browser
     const { headless, args, proxy, docker, defaultViewport } = this._state
     if (proxy) {
@@ -182,16 +183,32 @@ class Engine {
     if (docker) {
       args.push('--no-sandbox', '--headless', '--disable-dev-shm-usage')
     }
-    const browser = await puppeteer.launch({ headless, args, defaultViewport })
 
-    // Ensure that new tabs cannot be opened
-    await browser.on('targetcreated', (target) => {
-      if (target.type() === 'page') {
-        target.page().then(page => page.close())
-      }
-    })
+    if (remoteAddress === "") {
+      const browser = await puppeteer.launch({ headless, args, defaultViewport })
 
-    return browser
+      // Ensure that new tabs cannot be opened
+      await browser.on('targetcreated', (target) => {
+        if (target.type() === 'page') {
+          target.page().then(page => page.close())
+        }
+      })
+
+      return browser
+    } else {
+      // remote headless chrome is to be used instead, so just connect :-)
+
+      const browser = await puppeteer.connect({ browserWSEndpoint: /*'ws://localhost:3000'*/ remoteAddress });
+
+      // TODO: do we even care about remote new tabs?
+      await browser.on('targetcreated', (target) => {
+        if (target.type() === 'page') {
+          target.page().then(page => page.close())
+        }
+      })
+
+      return browser;
+    }
   }
 
   async _newPage (page) {

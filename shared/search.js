@@ -161,7 +161,8 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
         docker,
         parser: parse,
         terminate,
-        debug: debugPort
+        debug: debugPort, 
+        remotechrome
       } = args
 
     // Create engine
@@ -179,7 +180,7 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
         await db.open()
 
         // Setup engine options
-        const options = { headless, proxy, docker }
+        const options = { headless, proxy, docker, remotechrome }
         if (debugPort) {
             options.args = [ `--remote-debugging-port=${debugPort}` ]
         }
