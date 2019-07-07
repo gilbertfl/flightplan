@@ -76,11 +76,12 @@ class Engine {
       timeout,
       verbose,
       cookies,
-      evasions
+      evasions, 
+      remotechrome
     }
 
     // Setup browser and new page
-    this._state.browser = await this._newBrowser(remotechrome)
+    this._state.browser = await this._newBrowser(this._state.remotechrome)
     const page = (await this._state.browser.pages())[0]
     this._state.page = await this._newPage(page)
 
@@ -142,8 +143,13 @@ class Engine {
 
   async close () {
     const { browser } = this._state
+    const remotechrome = this._state.remotechrome || ""
     if (browser) {
-      await browser.close()
+      if (remotechrome !== "") {
+        await browser.disconnect()
+      } else {
+        await browser.close()
+      }
       this._state.browser = null
       this._state.page = null
       this._state.closed = true
@@ -197,8 +203,10 @@ class Engine {
       return browser
     } else {
       // remote headless chrome is to be used instead, so just connect :-)
-
-      const browser = await puppeteer.connect({ browserWSEndpoint: /*'ws://localhost:3000'*/ remoteAddress });
+      const browser = await puppeteer.connect({ 
+        browserWSEndpoint: remoteAddress,  
+        defaultViewport: defaultViewport
+      });
 
       // TODO: do we even care about remote new tabs?
       await browser.on('targetcreated', (target) => {
