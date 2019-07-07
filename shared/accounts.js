@@ -68,7 +68,20 @@ you're searching.`)
   }, {})
 }
 
-function getCredentials (engine, account = 0) {
+function getCredentials (engine, account = 0, credentialsOverride = "") {
+  if (credentialsOverride != "") {
+    // this means we don't bother looking, we just read the string instead of the file
+    // Convert rows to map, grouped by engine
+    const rows = parse(credentialsOverride, { delimiter: ':', relax_column_count: true })
+    accounts = rows.reduce((map, row) => {
+      const key = row[0].toUpperCase()
+      if (!map[key]) {
+        map[key] = []
+      }
+      map[key].push(row.slice(1))
+      return map
+    }, {})
+  }
   if (!accounts) {
     accounts = loadAccounts()
   }

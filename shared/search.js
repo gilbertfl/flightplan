@@ -164,7 +164,7 @@ function redundantSegment (routeMap, query) {
     return false
 }
 
-async function doSearch(args) {
+async function doSearch(args, credentialsOverride) {
     // Create engine
     const engine = fp.new(args.website)
     let initialized = false
@@ -172,7 +172,7 @@ async function doSearch(args) {
     try {
         // Create data path if necessary
         if (!fs.existsSync(paths.data)) {
-        fs.mkdirSync(paths.data)
+            fs.mkdirSync(paths.data)
         }
 
         // Create database if necessary, and then open
@@ -182,7 +182,7 @@ async function doSearch(args) {
         // Setup engine options
         const options = { headless, proxy, docker }
         if (debugPort) {
-        options.args = [ `--remote-debugging-port=${debugPort}` ]
+            options.args = [ `--remote-debugging-port=${debugPort}` ]
         }
 
         // Generate queries
@@ -195,73 +195,73 @@ async function doSearch(args) {
         let lastDate = null
         console.log(`Searching ${days} days of award inventory: ${timetable.format(startDate)} - ${timetable.format(endDate)}`)
         for (const query of queries) {
-        const { id, loginRequired } = engine
+            const { id, loginRequired } = engine
 
-        // Check if the query's results are already stored
-        if (!args.force && await redundant(query)) {
-            skipped++
-            continue
-        }
-
-        // Should we terminate?
-        if (terminate && parse && query.departDate !== lastDate) {
-            daysRemaining--
-            lastDate = query.departDate
-            if (daysRemaining < 0) {
-            console.log(`Terminating search after no award inventory found for ${terminate} days.`)
-            }
-        }
-
-        // Lazy load the search engine
-        if (!initialized) {
-            const credentials = loginRequired
-            ? accounts.getCredentials(id, args.account) : null
-            await engine.initialize({ ...options, credentials })
-            initialized = true
-        }
-
-        // Print route(s) being searched
-        routes.print(query)
-
-        // Run the search query, then check for searcher errors
-        let results
-        try {
-            results = await engine.search(query)
-            if (!results.ok) {
-            continue
-            }
-        } catch (err) {
-            engine.error('Unexpected error occurred while searching!')
-            console.error(err)
-            continue
-        }
-
-        // Parse awards, then check for parser errors
-        let awards
-        if (parse) {
-            try {
-            awards = results.awards
-            if (!results.ok) {
-                engine.error(`Could not parse awards: ${results.error}`)
+            // Check if the query's results are already stored
+            if (!args.force && await redundant(query)) {
+                skipped++
                 continue
             }
-            engine.success(`Found: ${awards.length} awards, ${results.flights.length} flights`)
-            } catch (err) {
-            engine.error('Unexpected error occurred while parsing!')
-            console.error(err)
-            continue
-            }
-        }
 
-        // Write request and awards (if parsed) to database
-        const requestId = await helpers.saveRequest(results);
-        if (awards) {
-            if (awards.length > 0) {
-            daysRemaining = terminate // Reset termination counter
+            // Should we terminate?
+            if (terminate && parse && query.departDate !== lastDate) {
+                daysRemaining--
+                lastDate = query.departDate
+                if (daysRemaining < 0) {
+                console.log(`Terminating search after no award inventory found for ${terminate} days.`)
+                }
             }
-            const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
-            await helpers.saveAwards(requestId, awards, placeholders)
-        }
+
+            // Lazy load the search engine
+            if (!initialized) {
+                const credentials = loginRequired
+                ? accounts.getCredentials(id, args.account, credentialsOverride) : null
+                await engine.initialize({ ...options, credentials })
+                initialized = true
+            }
+
+            // Print route(s) being searched
+            routes.print(query)
+
+            // Run the search query, then check for searcher errors
+            let results
+            try {
+                results = await engine.search(query)
+                if (!results.ok) {
+                continue
+                }
+            } catch (err) {
+                engine.error('Unexpected error occurred while searching!')
+                console.error(err)
+                continue
+            }
+
+            // Parse awards, then check for parser errors
+            let awards
+            if (parse) {
+                try {
+                awards = results.awards
+                if (!results.ok) {
+                    engine.error(`Could not parse awards: ${results.error}`)
+                    continue
+                }
+                engine.success(`Found: ${awards.length} awards, ${results.flights.length} flights`)
+                } catch (err) {
+                engine.error('Unexpected error occurred while parsing!')
+                console.error(err)
+                continue
+                }
+            }
+
+            // Write request and awards (if parsed) to database
+            const requestId = await helpers.saveRequest(results);
+            if (awards) {
+                if (awards.length > 0) {
+                daysRemaining = terminate // Reset termination counter
+                }
+                const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
+                await helpers.saveAwards(requestId, awards, placeholders)
+            }
         }
         if (skipped > 0) {
         console.log(`Skipped ${skipped} queries.`)
