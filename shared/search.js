@@ -267,12 +267,7 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
         }
         logger.success('Search complete!')
     } catch (err) {
-        if (typeof engine === 'string') {
-            err = message
-            message = engine
-            engine = null
-        }
-        engine ? engine.error(message) : logger.error(message)
+        engine ? engine.error('A fatal error occurred!') : logger.error('A fatal error occurred!')
         if (err) {
             console.error(err)
         }
