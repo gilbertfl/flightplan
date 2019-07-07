@@ -142,10 +142,10 @@ function redundantSegment (routeMap, query) {
     const { quantity } = query
     if (routeMap) {
         if (routeMap.requests.find(x => x.quantity === quantity)) {
-        return true // We've already run a request for this segment
+            return true // We've already run a request for this segment
         }
         if (routeMap.awards.find(x => x.segments && x.fares === '' && x.quantity <= quantity)) {
-        return true // We already know this segment has no availability for an equal or lesser quantity
+            return true // We already know this segment has no availability for an equal or lesser quantity
         }
     }
     return false
@@ -208,14 +208,14 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
                 daysRemaining--
                 lastDate = query.departDate
                 if (daysRemaining < 0) {
-                console.log(`Terminating search after no award inventory found for ${terminate} days.`)
+                    console.log(`Terminating search after no award inventory found for ${terminate} days.`)
                 }
             }
 
             // Lazy load the search engine
             if (!initialized) {
                 const credentials = loginRequired
-                ? accounts.getCredentials(id, args.account, credentialsOverride) : null
+                    ? accounts.getCredentials(id, args.account, credentialsOverride) : null
                 await engine.initialize({ ...options, credentials })
                 initialized = true
             }
@@ -228,7 +228,7 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
             try {
                 results = await engine.search(query)
                 if (!results.ok) {
-                continue
+                    continue
                 }
             } catch (err) {
                 engine.error('Unexpected error occurred while searching!')
@@ -247,9 +247,9 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
                 }
                 engine.success(`Found: ${awards.length} awards, ${results.flights.length} flights`)
                 } catch (err) {
-                engine.error('Unexpected error occurred while parsing!')
-                console.error(err)
-                continue
+                    engine.error('Unexpected error occurred while parsing!')
+                    console.error(err)
+                    continue
                 }
             }
 
@@ -257,14 +257,14 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
             const requestId = await helpers.saveRequest(results);
             if (awards) {
                 if (awards.length > 0) {
-                daysRemaining = terminate // Reset termination counter
+                    daysRemaining = terminate // Reset termination counter
                 }
                 const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
                 await helpers.saveAwards(requestId, awards, placeholders)
             }
         }
         if (skipped > 0) {
-        console.log(`Skipped ${skipped} queries.`)
+            console.log(`Skipped ${skipped} queries.`)
         }
         logger.success('Search complete!')
     } catch (err) {
