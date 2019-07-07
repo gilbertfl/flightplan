@@ -165,6 +165,18 @@ function redundantSegment (routeMap, query) {
 }
 
 async function doSearch(args, credentialsOverride) {
+
+    const {
+        start: startDate,
+        end: endDate,
+        headless,
+        proxy,
+        docker,
+        parser: parse,
+        terminate,
+        debug: debugPort
+      } = args
+
     // Create engine
     const engine = fp.new(args.website)
     let initialized = false

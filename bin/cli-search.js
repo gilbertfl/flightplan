@@ -152,16 +152,6 @@ function validateArguments (args) {
 }
 
 const main = async (args) => {
-  const {
-    start: startDate,
-    end: endDate,
-    headless,
-    proxy,
-    docker,
-    parser: parse,
-    terminate,
-    debug: debugPort
-  } = args
 
   await searchHelper.doSearch(args);
 
