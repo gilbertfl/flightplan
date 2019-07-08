@@ -30,7 +30,8 @@ async function open () {
 
     _pool.on('error', err => {
       console.error(err);
-    })
+      throw err;
+    });
   }
 
   return _pool;
