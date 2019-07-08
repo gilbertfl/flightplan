@@ -52,12 +52,13 @@ app.get('/api/search', async (req, res, next) => {
       endDate = '',
       cabin,
       limit, 
-      remotechrome = ''
+      remotechrome = '', 
+      credentials = ''
     } = req.query
 
     console.time('search')
 
-    let awards = await db.doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit, remotechrome)
+    let awards = await db.doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit, remotechrome, credentials)
 
     console.timeEnd('search')
 

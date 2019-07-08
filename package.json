@@ -34,7 +34,7 @@
     "parse-duration": "^0.1.1",
     "puppeteer": "^1.18.1",
     "shelljs": "^0.8.2",
-    "syncprompt": "^2.0.0",
+    "prompt-sync": "^4.1.7",
     "timetable-fns": "^0.1.16"
   },
   "devDependencies": {

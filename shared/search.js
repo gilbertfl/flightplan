@@ -151,7 +151,7 @@ function redundantSegment (routeMap, query) {
     return false
 }
 
-async function doSearch(args, credentialsOverride, handleExceptions = true) {
+async function doSearch(args, handleExceptions = true) {
 
     const {
         start: startDate,
@@ -162,7 +162,8 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
         parser: parse,
         terminate,
         debug: debugPort, 
-        remotechrome
+        remotechrome, 
+        credentials
       } = args
 
     // Create engine
@@ -214,9 +215,9 @@ async function doSearch(args, credentialsOverride, handleExceptions = true) {
 
             // Lazy load the search engine
             if (!initialized) {
-                const credentials = loginRequired
-                    ? accounts.getCredentials(id, args.account, credentialsOverride) : null
-                await engine.initialize({ ...options, credentials })
+                const loadedCredentials = loginRequired
+                    ? accounts.getCredentials(id, args.account, credentials) : null
+                await engine.initialize({ ...options, loadedCredentials })
                 initialized = true
             }
 

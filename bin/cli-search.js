@@ -1,6 +1,6 @@
 const program = require('commander')
 const fs = require('fs')
-const prompt = require('syncprompt')
+const prompt = require('prompt-sync')
 const timetable = require('timetable-fns')
 
 const fp = require('../src')
@@ -26,6 +26,7 @@ program
   .option('-h, --headless', `Run Chrome in headless mode`)
   .option('-p, --proxy <server>', `Provide a proxy to use with Chome (server:port:user:pass)`)
   .option('--remotechrome <wsurl>', `Provide a remote headless chrome url instead of local chromium (ws://url)`)
+  .option('--credentials <text from accounts.txt>', `Provide text from accounts.txt in place of file`)
   .option('-d, --docker', `Enable flags to make allow execution in docker environment`)
   .option('-P, --no-parser', `Do not parse search results`)
   .option('-r, --reverse', `Run queries in reverse chronological order`)
