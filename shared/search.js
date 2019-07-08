@@ -163,7 +163,7 @@ async function doSearch(args, handleExceptions = true) {
         terminate,
         debug: debugPort, 
         remotechrome, 
-        credentials
+        credentials: credentialsToOverride
       } = args
 
     // Create engine
@@ -215,9 +215,9 @@ async function doSearch(args, handleExceptions = true) {
 
             // Lazy load the search engine
             if (!initialized) {
-                const loadedCredentials = loginRequired
-                    ? accounts.getCredentials(id, args.account, credentials) : null
-                await engine.initialize({ ...options, loadedCredentials })
+                const credentials = loginRequired
+                    ? accounts.getCredentials(id, args.account, credentialsToOverride) : null
+                await engine.initialize({ ...options, credentials })
                 initialized = true
             }
 
