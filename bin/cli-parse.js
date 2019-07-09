@@ -24,9 +24,9 @@ const main = async (args) => {
   let numAwards = 0
 
   try {
-    // Open the database
-    logger.info('Opening database...')
-    await db.open()
+    // // Open the database
+    // logger.info('Opening database...')
+    // await db.open()
 
     // Iterate over search requests
     logger.info('Parsing search requests...')

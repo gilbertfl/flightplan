@@ -56,9 +56,9 @@ const main = async (args) => {
   const { website } = args
 
   try {
-    // Open the database
-    console.log('Opening database...')
-    await db.open()
+    // // Open the database
+    // console.log('Opening database...')
+    // await db.open()
 
     // Iterate over requests and awards
     const routes = new Map()

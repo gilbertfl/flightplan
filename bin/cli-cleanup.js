@@ -147,9 +147,9 @@ const main = async (args) => {
   const { yes, verbose, maxage = 'P1Y' } = args
 
   try {
-    // Open the database
-    console.log('Opening database...')
-    await db.open()
+    // // Open the database
+    // console.log('Opening database...')
+    // await db.open()
 
     // Cleanup resources
     const { resources } = await cleanupResources(yes, verbose)
