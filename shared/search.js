@@ -151,7 +151,7 @@ function redundantSegment (routeMap, query) {
     return false
 }
 
-async function doSearch(args, handleExceptions = true) {
+async function doSearch(args, handleExceptions = true, customLogger = null) {
 
     const {
         start: startDate,
@@ -176,9 +176,13 @@ async function doSearch(args, handleExceptions = true) {
             fs.mkdirSync(paths.data)
         }
 
-        // Create database if necessary, and then open
-        await db.migrate()
-        await db.open()
+        // // Create database if necessary, and then open
+        // await db.migrate()
+        // await db.open()
+
+        if (customLogger) {
+            customLogger("database opened.");
+        }
 
         // Setup engine options
         const options = { headless, proxy, docker, remotechrome }

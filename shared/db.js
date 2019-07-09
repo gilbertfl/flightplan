@@ -3,7 +3,7 @@ const util = require('util')
 const paths = require('./paths')
 const utils = require('../src/utils')
 
-let _pool = null;
+//let _pool = null;
 
 
 // Create connection to database
@@ -21,10 +21,9 @@ var connectionConfig =
   }
 };
 
-async function open () {
-  if (!_pool) {
+async function getPool() {
+  if (typeof _pool === 'undefined' || !_pool) {
     console.log(`Attempting to open database pool: ${paths.database}`);
-    //_pool = await sql.connect(connectionConfig);
     _pool = new sql.ConnectionPool(connectionConfig);
     await _pool.connect();
 
@@ -42,11 +41,12 @@ async function getRequestsWithoutAwards(engine, force) {
   let sql = force
     ? 'SELECT * FROM requests'
     : 'SELECT requests.* FROM requests LEFT JOIN awards ON requests.id = awards.requestId WHERE requestId IS NULL';
+  var pool = await getPool();
   if (engine) {
     sql += `${force ? ' WHERE' : ' AND'} requests.engine = @engine`;
-    return await _pool.request().input('engine').query(sql);
+    return await pool.request().input('engine').query(sql);
   } else {
-    return await _pool.request().query(sql);
+    return await pool.request().query(sql);
   }
 }
 
@@ -56,7 +56,8 @@ async function getRequestsForOW(route) {
   const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
   const departStr = departDate || null
 
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .input('engine', sql.VarChar, engine)
     .input('partners', sql.Bit, partners ? 1 : 0)
     .input('cabin', sql.VarChar, cabin)
@@ -78,7 +79,8 @@ async function getRequestsForRT(route) {
   const departStr = departDate || null
   const returnStr = returnDate || null
 
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .input('engine', sql.VarChar, engine)
     .input('partners', sql.Bit, partners ? 1 : 0)
     .input('cabin', sql.VarChar, cabin)
@@ -101,7 +103,8 @@ async function getAwardsForRT(route) {
   const departStr = departDate || null
   const returnStr = returnDate || null
 
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .input('engine', sql.VarChar, engine)
     .input('cabin', sql.VarChar, cabin)
     .input('quantity', sql.Int, quantity)
@@ -122,7 +125,8 @@ async function getAwardsForOW(route) {
   const { engine, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
   const departStr = departDate || null
 
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .input('engine', sql.VarChar, engine)
     .input('cabin', sql.VarChar, cabin)
     .input('quantity', sql.Int, quantity)
@@ -137,40 +141,46 @@ async function getAwardsForOW(route) {
 }
 
 async function getAllRequests() {
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .query('SELECT * FROM requests');
   return result.recordset;
 }
 
 async function getAllAwards() {
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .query('SELECT * FROM awards');
   return result.recordset;
 }
 
 async function getSegments(awardId) {
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .input('awardId', sql.Int, awardId)
     .query('SELECT * FROM segments WHERE awardId = @awardId');
   return result.recordset;
 }
 
 async function cleanupRequest(requestId) {
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .input('requestId', sql.Int, requestId)
     .query('DELETE FROM requests WHERE id = @requestId');
   return result.recordset;
 }
 
 async function getRequest(requestId) {
-  var result = await _pool.request()
+  var pool = await getPool();
+  var result = await pool.request()
     .input('requestId', sql.Int, requestId)
     .query('SELECT * FROM requests WHERE id = @requestId');
   return result.recordset;
 }
 
 async function cleanupAwards(awards) {
-  const transaction = _pool.transaction();
+  var pool = await getPool();
+  const transaction = pool.transaction();
 
   transaction.begin(async transactionBeginErr => {
     if (transactionBeginErr) {
@@ -279,7 +289,8 @@ doSaveSegment[util.promisify.custom] = (transaction, awardId, position, row) => 
 };
 async function saveSegment(awardId, position, row) {
   var promisifiedSaveSegment = util.promisify(doSaveSegment);
-  return await promisifiedSaveSegment(_pool.transaction(), awardId, position, row);
+  var pool = await getPool();
+  return await promisifiedSaveSegment(pool.transaction(), awardId, position, row);
 }
 
 function doSaveRequest(transaction, row, resolve, reject) {
@@ -352,7 +363,8 @@ doSaveRequest[util.promisify.custom] = (transaction, row) => {
 };
 async function saveRequest(row) {
   var promisifiedSaveRequest = util.promisify(doSaveRequest);
-  return await promisifiedSaveRequest(_pool.transaction(), row);
+  var pool = await getPool();
+  return await promisifiedSaveRequest(pool.transaction(), row);
 }
 
 
@@ -452,9 +464,10 @@ doSaveAward[util.promisify.custom] = (pool, requestId, row) => {
 };
 async function saveAwards(requestId, rows) {
   var promisifiedSaveAward = util.promisify(doSaveAward);
+  var pool = await getPool();
   for (const row of rows) {
     // if saving fails, promise is rejected and an exception *should* be thrown
-    var segments = await promisifiedSaveAward(_pool, requestId, row);
+    var segments = await promisifiedSaveAward(pool, requestId, row);
     if (segments) {
       for (let i=0; i<segments.length; i++) {
         await saveSegment(segments[i].awardId, i, segments[i].segment);
@@ -476,8 +489,9 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
     throw new Error(`Invalid date range for search: ${startDate} -> ${endDate}`);
   }
 
-  var awardsRequest = _pool.request();
-  var segmentsRequest = _pool.request();
+  var pool = await getPool();
+  var awardsRequest = pool.request();
+  var segmentsRequest = pool.request();
   let query = ' WHERE ';
 
   // Add cities
@@ -547,21 +561,23 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
 
 async function getAllRequestsForEngine(engine) {
   let sql = `SELECT * FROM requests`;
+  var pool = await getPool();
   if (engine) {
     sql += ' WHERE engine = @engine';
-    return await _pool.request().input('engine', sql.VarChar, engine).query(sql);
+    return await pool.request().input('engine', sql.VarChar, engine).query(sql);
   } else {
-    return await _pool.request().query(sql);
+    return await pool.request().query(sql);
   }
 }
 
 async function getAllAwardsForEngine(engine) {
   let sql = `SELECT * FROM awards`;
+  var pool = await getPool();
   if (engine) {
     sql += ' WHERE engine = @engine';
-    return await _pool.request().input('engine', sql.VarChar, engine).query(sql);
+    return await pool.request().input('engine', sql.VarChar, engine).query(sql);
   } else {
-    return await _pool.request().query(sql);
+    return await pool.request().query(sql);
   }
 }
 
@@ -570,7 +586,7 @@ async function migrate() {
 }
 
 function close () {
-  if (_pool) {
+  if (typeof _pool !== 'undefined' && _pool) {
     _pool.close();
     _pool = null
   }
@@ -588,7 +604,6 @@ module.exports = {
   getAllAwardsForEngine, 
   getAwardsForRT,
   getAwardsForOW, 
-  open,
   saveAwards, 
   saveSegment, 
   saveRequest, 

@@ -70,9 +70,9 @@ app.get('/api/search', async (req, res, next) => {
 
 const main = async () => {
   try {
-    // Open database
-    console.log('Opening database...')
-    await db.open()
+    // // Open database
+    // console.log('Opening database...')
+    // await db.open()
 
     // Launch Express server
     console.log(`Running web server on port: ${port}`)
