@@ -14,20 +14,8 @@ program
   .option('--force', 'Re-parse requests, even if they have already been parsed previously')
   .parse(process.argv)
 
-function getRequests (engine, force) {
-  const bind = []
-
-  // Select only those requests without corresponding entries in awards table
-  let sql = force
-    ? 'SELECT * FROM requests'
-    : 'SELECT requests.* FROM requests LEFT JOIN awards ON requests.id = awards.requestId WHERE requestId IS NULL'
-  if (engine) {
-    sql += `${force ? ' WHERE' : ' AND'} requests.engine = ?`
-    bind.push(engine)
-  }
-
-  // Evaluate the SQL
-  return db.db().prepare(sql).all(...bind)
+async function getRequests (engine, force) {
+  return await db.getRequestsWithoutAwards(engine, force);
 }
 
 const main = async (args) => {
@@ -38,14 +26,14 @@ const main = async (args) => {
   try {
     // Open the database
     logger.info('Opening database...')
-    db.open()
+    await db.open()
 
     // Iterate over search requests
     logger.info('Parsing search requests...')
     const failed = []
-    for (const row of getRequests(args.website, force)) {
+    for (const row of await getRequests(args.website, force)) {
       // First delete all awards associated with this request
-      const oldAwards = db.db().prepare('SELECT id FROM awards WHERE requestId = ?').all(row.id)
+      const oldAwards = await db.getRequest(row.id)
       helpers.cleanupAwards(oldAwards)
 
       // Create a Results instance from the row
@@ -79,7 +67,7 @@ const main = async (args) => {
 
       // Update the database
       const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
-      helpers.saveAwards(row.id, awards, placeholders)
+      await helpers.saveAwards(row.id, awards, placeholders)
       numAwards += awards.length
     }
 

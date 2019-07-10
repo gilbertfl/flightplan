@@ -9,18 +9,15 @@ program
   .option('-w, --website <airline>', 'Limit parsing to the specified airline (IATA 2-letter code)')
   .parse(process.argv)
 
-function getRows (table, engine) {
-  const bind = []
-  let sql = `SELECT * FROM ${table}`
-  if (engine) {
-    sql += ' WHERE engine = ?'
-    bind.push(engine)
+async function processRows (type, routes, engine) {
+  var rows = null
+  if (type == 'requests') {
+    rows = await db.getAllRequestsForEngine(engine);
+  } else if (type == 'awards') {
+    rows = await db.getAllAwardsForEngine(engine);
+  } else {
+    throw new Error('Cannot process specified type of row.');
   }
-  return db.db().prepare(sql).all(...bind)
-}
-
-function processRows (type, routes, engine) {
-  const rows = getRows(type, engine)
   for (const row of rows) {
     const { fromCity, toCity, returnDate } = row
     store(row, type, routes, fromCity, toCity)
@@ -61,14 +58,14 @@ const main = async (args) => {
   try {
     // Open the database
     console.log('Opening database...')
-    db.open()
+    await db.open()
 
     // Iterate over requests and awards
     const routes = new Map()
     console.log('Analyzing requests table...')
-    const numRequests = processRows('requests', routes, website)
+    const numRequests = await processRows('requests', routes, website)
     console.log('Analyzing awards table...')
-    const numAwards = processRows('awards', routes, website)
+    const numAwards = await processRows('awards', routes, website)
 
     // Present stats
     console.log('')

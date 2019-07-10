@@ -29,11 +29,11 @@ function getOrSet (map, key) {
   return ret
 }
 
-function find (route, database = db.db()) {
+async function find (route, database = db.db()) {
   const map = new Map()
 
   // Update map with award requests
-  for (const row of requests(route, database)) {
+  for (const row of await requests(route)) {
     const { departDate, returnDate } = row
     let obj = getOrSet(map, key(row, departDate))
     obj.requests.push(row)
@@ -44,7 +44,7 @@ function find (route, database = db.db()) {
   }
 
   // Now update with awards
-  for (const row of awards(route, database)) {
+  for (const row of await awards(route)) {
     let obj = getOrSet(map, key(row, row.date))
     obj.awards.push(row)
   }
@@ -52,47 +52,28 @@ function find (route, database = db.db()) {
   return map
 }
 
-function requests (route, database) {
+async function requests (route, database) {
   // If no route defined, just select all records
   if (!route) {
-    return database.prepare('SELECT * FROM requests').all()
+    return await db.getAllRequests()
   }
 
-  // Format dates
   const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
-  const departStr = departDate || null
-  const returnStr = returnDate || null
 
   // Select only the relevant segments
   if (returnDate) {
     // Round-Trip route
-    const sql = 'SELECT * FROM requests WHERE ' +
-      'engine = ? AND partners = ? AND cabin = ? AND quantity = ? AND (' +
-        '(fromCity = ? AND toCity = ? AND (departDate = ? OR returnDate = ?)) OR ' +
-        '(fromCity = ? AND toCity = ? AND (departDate = ? OR returnDate = ?)))'
-    return database.prepare(sql).all(
-      engine, partners ? 1 : 0, cabin, quantity,
-      fromCity, toCity, departStr, returnStr,
-      toCity, fromCity, returnStr, departStr
-    )
+    return await db.getRequestsForRT(route)
   } else {
     // One-Way route
-    const sql = 'SELECT * FROM requests WHERE ' +
-      'engine = ? AND partners = ? AND cabin = ? AND quantity = ? AND (' +
-        '(fromCity = ? AND toCity = ? AND departDate = ?) OR ' +
-        '(fromCity = ? AND toCity = ? AND returnDate = ?))'
-    return database.prepare(sql).all(
-      engine, partners ? 1 : 0, cabin, quantity,
-      fromCity, toCity, departStr,
-      toCity, fromCity, departStr
-    )
+    return await db.getRequestsForOW(route)
   }
 }
 
-function awards (route, database) {
+async function awards (route, database) {
   // If no route defined, just select all records
   if (!route) {
-    return database.prepare('SELECT * FROM awards').all()
+    return await db.getAllAwards()
   }
 
   // Format dates
@@ -103,24 +84,10 @@ function awards (route, database) {
   // Select only the relevant segments
   if (returnDate) {
     // Round-Trip route
-    const sql = 'SELECT * FROM awards WHERE ' +
-      'engine = ? AND cabin = ? AND quantity <= ? AND (' +
-        '(fromCity = ? AND toCity = ? AND date = ?) OR ' +
-        '(fromCity = ? AND toCity = ? AND date = ?))'
-    return database.prepare(sql).all(
-      engine, cabin, quantity,
-      fromCity, toCity, departStr,
-      toCity, fromCity, returnStr
-    )
+    return await db.getAwardsForRT(route)
   } else {
     // One-Way route
-    const sql = 'SELECT * FROM awards WHERE ' +
-      'engine = ? AND cabin = ? AND quantity <= ? AND ' +
-        'fromCity = ? AND toCity = ? AND date = ?'
-    return database.prepare(sql).all(
-      engine, cabin, quantity,
-      fromCity, toCity, departStr
-    )
+    return await db.getAwardsForOW(route)
   }
 }
 

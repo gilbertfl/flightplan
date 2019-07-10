@@ -55,10 +55,11 @@ class Engine {
       height = utils.randomInt(1400, 1440),
       proxy,
       throttle = true,
-      timeout = 90000,
+      timeout = 180000,
       verbose = true,
       cookies,
-      evasions = {}
+      evasions = {}, 
+      remotechrome = ""
     } = options
 
     // Save options
@@ -75,11 +76,12 @@ class Engine {
       timeout,
       verbose,
       cookies,
-      evasions
+      evasions, 
+      remotechrome
     }
 
     // Setup browser and new page
-    this._state.browser = await this._newBrowser()
+    this._state.browser = await this._newBrowser(this._state.remotechrome)
     const page = (await this._state.browser.pages())[0]
     this._state.page = await this._newPage(page)
 
@@ -141,8 +143,13 @@ class Engine {
 
   async close () {
     const { browser } = this._state
+    const remotechrome = this._state.remotechrome || ""
     if (browser) {
-      await browser.close()
+      if (remotechrome !== "") {
+        await browser.disconnect()
+      } else {
+        await browser.close()
+      }
       this._state.browser = null
       this._state.page = null
       this._state.closed = true
@@ -173,7 +180,7 @@ class Engine {
     this._state.page = newPage
   }
 
-  async _newBrowser () {
+  async _newBrowser (remoteAddress = "") {
     // Create a new browser
     const { headless, args, proxy, docker, defaultViewport } = this._state
     if (proxy) {
@@ -182,16 +189,33 @@ class Engine {
     if (docker) {
       args.push('--no-sandbox', '--headless', '--disable-dev-shm-usage')
     }
-    const browser = await puppeteer.launch({ headless, args, defaultViewport })
+    if (remoteAddress === "") {
+      const browser = await puppeteer.launch({ headless, args, defaultViewport })
+      
+      // Ensure that new tabs cannot be opened
+      await browser.on('targetcreated', (target) => {
+        if (target.type() === 'page') {
+          target.page().then(page => page.close())
+        }
+      })
 
-    // Ensure that new tabs cannot be opened
-    await browser.on('targetcreated', (target) => {
-      if (target.type() === 'page') {
-        target.page().then(page => page.close())
-      }
-    })
+      return browser
+    } else {
+      // remote headless chrome is to be used instead, so just connect :-)
+      const browser = await puppeteer.connect({ 
+        browserWSEndpoint: remoteAddress,  
+        defaultViewport: defaultViewport
+      })
 
-    return browser
+      // TODO: do we even care about remote new tabs?
+      await browser.on('targetcreated', (target) => {
+        if (target.type() === 'page') {
+          target.page().then(page => page.close())
+        }
+      })
+
+      return browser
+    }
   }
 
   async _newPage (page) {

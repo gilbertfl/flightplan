@@ -67,7 +67,7 @@ export default class SearchStore {
     return this._results
       .filter(result => (
         (showPartner || result.partner === 0) &&
-        (showMixedCabin || result.mixed === 0) &&
+        (showMixedCabin || (result.mixed === 0 || result.mixed === false)) &&
         (maxStops < 0 || result.stops <= maxStops)
       ))
       .map(result => {

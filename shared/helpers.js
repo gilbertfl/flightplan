@@ -45,7 +45,7 @@ function assetsForRequest (request) {
   return [...html, ...json, ...screenshot].map(x => x.path)
 }
 
-function cleanupRequest (request) {
+async function cleanupRequest (request) {
   // Delete assets from disk
   for (const filename of assetsForRequest(request)) {
     if (fs.existsSync(filename)) {
@@ -54,24 +54,11 @@ function cleanupRequest (request) {
   }
 
   // Remove from the database
-  db.db().prepare('DELETE FROM requests WHERE id = ?').run(request.id)
+  await db.cleanupRequest(request.id)
 }
 
-function cleanupAwards (awards) {
-  const stmtDelAward = db.db().prepare('DELETE FROM awards WHERE id = ?')
-  const stmtDelSegments = db.db().prepare('DELETE FROM segments WHERE awardId = ?')
-
-  db.begin()
-  let success = false
-  try {
-    for (const award of awards) {
-      stmtDelSegments.run(award.id)
-      stmtDelAward.run(award.id)
-    }
-    success = true
-  } finally {
-    success ? db.commit() : db.rollback()
-  }
+async function cleanupAwards (awards) {
+  await db.cleanupAwards(awards);
 }
 
 function loadRequest (row) {
@@ -91,7 +78,7 @@ function loadRequest (row) {
   })
 }
 
-function saveRequest (results) {
+async function saveRequest (results) {
   // Get assets (only needs to have paths)
   const { assets } = results.trimContents()
 
@@ -110,10 +97,10 @@ function saveRequest (results) {
   }
 
   // Insert the row
-  return db.insertRow('requests', row).lastInsertROWID
+  return await db.saveRequest(row)
 }
 
-function saveAwards (requestId, awards, placeholders) {
+async function saveAwards (requestId, awards, placeholders) {
   const ids = []
 
   // Transform objects to rows
@@ -137,34 +124,10 @@ function saveAwards (requestId, awards, placeholders) {
     })
   }
 
-  // Wrap everything in a transaction
-  let success = false
-  db.begin()
-  try {
-    for (const row of rows) {
-      const { segments } = row
-      delete row.segments
-
-      // Save the individual award and get it's ID
-      row.requestId = requestId
-      const awardId = db.insertRow('awards', row).lastInsertROWID
-      ids.push(awardId)
-
-      // Now add each segment
-      if (segments) {
-        segments.forEach((segment, position) => {
-          saveSegment(awardId, position, segment)
-        })
-      }
-    }
-    success = true
-  } finally {
-    success ? db.commit() : db.rollback()
-  }
-  return success ? ids : null
+  await db.saveAwards(requestId, rows)
 }
 
-function saveSegment (awardId, position, segment) {
+async function saveSegment (awardId, position, segment) {
   // Build the row data
   const row = {
     airline: segment.airline,
@@ -185,7 +148,7 @@ function saveSegment (awardId, position, segment) {
   row.position = position
 
   // Save the individual award and get it's ID
-  return db.insertRow('segments', row).lastInsertROWID
+  return await db.saveSegment(row)
 }
 
 module.exports = {

@@ -20,7 +20,7 @@ async function cleanupResources (yes, verbose) {
   // Iterate over requests
   console.log('Scanning data resources...')
   const associatedFiles = new Set()
-  for (const row of db.db().prepare('SELECT * FROM requests').all()) {
+  for (const row of await db.getAllRequests()) {
     // Keep track of every file associated with a request
     helpers.assetsForRequest(row).forEach(x => associatedFiles.add(x))
   }
@@ -64,7 +64,7 @@ async function cleanupResources (yes, verbose) {
 async function cleanupRequests (yes, verbose) {
   console.log('Scanning search requests...')
   const requests = []
-  for (const row of db.db().prepare('SELECT * FROM requests').all()) {
+  for (const row of await db.getAllRequests()) {
     // Check for any missing resources
     const assets = helpers.assetsForRequest(row)
     const missing = !!assets.find(x => !fs.existsSync(x))
@@ -149,7 +149,7 @@ const main = async (args) => {
   try {
     // Open the database
     console.log('Opening database...')
-    db.open()
+    await db.open()
 
     // Cleanup resources
     const { resources } = await cleanupResources(yes, verbose)

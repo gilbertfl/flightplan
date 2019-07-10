@@ -9,6 +9,7 @@
   "scripts": {
     "postinstall": "cd client && yarn",
     "client": "cd client && yarn start",
+    "start": "node bin/cli-server.js",
     "server": "nodemon bin/cli-server.js",
     "dev": "concurrently --kill-others-on-fail -p \"[{name}]\" -n \"CLIENT,SERVER\" -c \"black.bgBlue.bold,black.bgGreen.bold\" \"yarn client\" \"yarn server\"",
     "test": "jest"
@@ -30,11 +31,11 @@
     "humanize-duration": "^3.15.3",
     "jspath": "^0.4.0",
     "moment": "^2.9.0",
-    "moment-timezone": "^0.5.23",
+    "moment-timezone": "^0.5.26",
     "parse-duration": "^0.1.1",
-    "puppeteer": "^1.6.0-next.1532381444032",
+    "puppeteer": "^1.18.1",
     "shelljs": "^0.8.2",
-    "syncprompt": "^2.0.0",
+    "prompt-sync": "^4.1.7",
     "timetable-fns": "^0.1.16"
   },
   "devDependencies": {

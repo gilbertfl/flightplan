@@ -59,7 +59,7 @@ const main = async (args) => {
     // Open destination database
     console.log('Opening source and destination databases...')
     const fromDB = new Database(dbPath)
-    db.open()
+    await db.open()
 
     // Create set of existing resources, so we don't add duplicate requests
     console.log('Checking existing resources...')

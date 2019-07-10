@@ -24,7 +24,7 @@ module.exports = {
       headless: false,
       proxy: undefined,
       throttle: true,
-      timeout: 90000,
+      timeout: 180000,
       verbose: true
     }
   },

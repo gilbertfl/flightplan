@@ -2,15 +2,11 @@ const Database = require('better-sqlite3')
 const fs = require('fs')
 const path = require('path')
 const rimraf = require('rimraf')
-
+const utils = require('../src/utils')
 const paths = require('./paths')
 const prompts = require('../shared/prompts')
 
 let _db = null
-
-function db () {
-  return _db
-}
 
 function open () {
   if (!_db) {
@@ -119,25 +115,151 @@ function createTable (tableName, columns) {
   return _db.prepare(`CREATE TABLE ${tableName} (${columns.join(',')})`).run()
 }
 
-function insertRow (table, row) {
-  const entries = Object.entries(row)
-  const colNames = entries.map(x => x[0])
-  const colVals = entries.map(x => coerceType(x[1]))
-  const sql = `INSERT INTO ${table} (${colNames.join(',')}) VALUES (${colVals.map(x => '?').join(',')})`
-  return _db.prepare(sql).run(...colVals)
-}
+async function getRequestsWithoutAwards(engine, force) {
+  const bind = []
 
-function coerceType (val) {
-  if (typeof val === 'boolean') {
-    return val ? 1 : 0
+  // Select only those requests without corresponding entries in awards table
+  let sql = force
+    ? 'SELECT * FROM requests'
+    : 'SELECT requests.* FROM requests LEFT JOIN awards ON requests.id = awards.requestId WHERE requestId IS NULL'
+  if (engine) {
+    sql += `${force ? ' WHERE' : ' AND'} requests.engine = ?`
+    bind.push(engine)
   }
-  return val
+
+  // Evaluate the SQL
+  return _db.prepare(sql).all(...bind)
 }
 
-function count (table) {
-  const result = _db.prepare(`SELECT count(*) FROM ${table}`).get()
-  return result ? result['count(*)'] : undefined
+async function getRequestsForOW(route) {
+  const sql = 'SELECT * FROM requests WHERE ' +
+      'engine = ? AND partners = ? AND cabin = ? AND quantity = ? AND (' +
+        '(fromCity = ? AND toCity = ? AND departDate = ?) OR ' +
+        '(fromCity = ? AND toCity = ? AND returnDate = ?))'
+  return _db.prepare(sql).all(
+    engine, partners ? 1 : 0, cabin, quantity,
+    fromCity, toCity, departStr,
+    toCity, fromCity, departStr
+  )
 }
+
+async function getRequestsForRT(route) {
+  const sql = 'SELECT * FROM requests WHERE ' +
+      'engine = ? AND partners = ? AND cabin = ? AND quantity = ? AND (' +
+        '(fromCity = ? AND toCity = ? AND (departDate = ? OR returnDate = ?)) OR ' +
+        '(fromCity = ? AND toCity = ? AND (departDate = ? OR returnDate = ?)))'
+  return _db.prepare(sql).all(
+    engine, partners ? 1 : 0, cabin, quantity,
+    fromCity, toCity, departStr, returnStr,
+    toCity, fromCity, returnStr, departStr
+  )
+}
+
+async function getAwardsForRT(route) {
+  const sql = 'SELECT * FROM awards WHERE ' +
+      'engine = ? AND cabin = ? AND quantity <= ? AND (' +
+        '(fromCity = ? AND toCity = ? AND date = ?) OR ' +
+        '(fromCity = ? AND toCity = ? AND date = ?))'
+  return _db.prepare(sql).all(
+    engine, cabin, quantity,
+    fromCity, toCity, departStr,
+    toCity, fromCity, returnStr
+  )
+}
+
+async function getAwardsForOW(route) {
+  const sql = 'SELECT * FROM awards WHERE ' +
+      'engine = ? AND cabin = ? AND quantity <= ? AND ' +
+        'fromCity = ? AND toCity = ? AND date = ?'
+  return _db.prepare(sql).all(
+    engine, cabin, quantity,
+    fromCity, toCity, departStr
+  )
+}
+
+async function getAllRequests() {
+  return _db.prepare('SELECT * FROM requests').all()
+}
+
+async function getAllAwards() {
+  return _db.prepare('SELECT * FROM awards').all()
+}
+
+async function getSegments(awardId) { 
+  // TODO: figure out who was supposed to call this!
+}
+
+async function cleanupRequest(requestId) {
+  _db.prepare('DELETE FROM requests WHERE id = ?').run(request.id)
+}
+
+async function getRequest(requestId) {
+  return _db.prepare('SELECT id FROM awards WHERE requestId = ?').all(requestId)
+}
+
+async function cleanupAwards(awards) {
+  const stmtDelAward = db.db().prepare('DELETE FROM awards WHERE id = ?')
+  const stmtDelSegments = db.db().prepare('DELETE FROM segments WHERE awardId = ?')
+
+  db.begin()
+  let success = false
+  try {
+    for (const award of awards) {
+      stmtDelSegments.run(award.id)
+      stmtDelAward.run(award.id)
+    }
+    success = true
+  } finally {
+    success ? db.commit() : db.rollback()
+  }
+}
+
+async function saveSegment(awardId, position, row) {
+  return db.insertRow('segments', row).lastInsertROWID
+}
+
+async function saveRequest(row) {
+  return db.insertRow('requests', row).lastInsertROWID
+}
+
+async function saveAwards(requestId, rows) {
+  // Wrap everything in a transaction
+  let success = false
+  db.begin()
+  try {
+    for (const row of rows) {
+      const { segments } = row
+      delete row.segments
+
+      // Save the individual award and get it's ID
+      row.requestId = requestId
+      const awardId = db.insertRow('awards', row).lastInsertROWID
+      ids.push(awardId)
+
+      // Now add each segment
+      if (segments) {
+        segments.forEach((segment, position) => {
+          saveSegment(awardId, position, segment)
+        })
+      }
+    }
+    success = true
+  } finally {
+    success ? db.commit() : db.rollback()
+  }
+  return success ? ids : null
+}
+
+async function doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit) {
+}
+
+async function getAllRequestsForEngine(engine) {
+}
+
+async function getAllAwardsForEngine(engine) {
+}
+
+
 
 function close () {
   if (_db) {
@@ -159,15 +281,23 @@ function rollback () {
 }
 
 module.exports = {
-  db,
-  open,
-  migrate,
-  createTable,
-  insertRow,
-  coerceType,
-  count,
-  close,
-  begin,
-  commit,
-  rollback
+  getAllRequests, 
+  getRequestsForRT, 
+  getRequestsForOW, 
+  getRequestsWithoutAwards, 
+  getAllRequestsForEngine, 
+  getRequest, 
+  getSegments, 
+  getAllAwards, 
+  getAllAwardsForEngine, 
+  getAwardsForRT,
+  getAwardsForOW, 
+  saveAwards, 
+  saveSegment, 
+  saveRequest, 
+  cleanupRequest,
+  cleanupAwards, 
+  doSearch, 
+  close, 
+  migrate
 }
