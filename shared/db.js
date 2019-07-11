@@ -3,7 +3,7 @@ const util = require('util')
 const paths = require('./paths')
 const utils = require('../src/utils')
 
-//let _pool = null;
+let _pool = null;
 
 
 // Create connection to database

@@ -155,7 +155,7 @@ function validateArguments (args) {
 
 const main = async (args) => {
 
-  await searchHelper.doSearch(args);
+  await searchHelper.searchWebsiteForAwards(args);
 
 }
 

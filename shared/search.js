@@ -151,7 +151,7 @@ function redundantSegment (routeMap, query) {
     return false
 }
 
-async function doSearch(args, handleExceptions = true, customLogger = null) {
+async function searchWebsiteForAwards(args, handleExceptions = true, customLogger = null) {
 
     const {
         start: startDate,
@@ -272,14 +272,16 @@ async function doSearch(args, handleExceptions = true, customLogger = null) {
             console.log(`Skipped ${skipped} queries.`)
         }
         logger.success('Search complete!')
+        return true
     } catch (err) {
         engine ? engine.error('A fatal error occurred!') : logger.error('A fatal error occurred!')
         if (err) {
             console.error(err)
         }
         if (!handleExceptions) {
-            throw err;
+            throw err
         }
+        return false
     } finally {
         await engine.close()
         db.close()
@@ -287,5 +289,5 @@ async function doSearch(args, handleExceptions = true, customLogger = null) {
 }
 
 module.exports = {
-    doSearch
+    searchWebsiteForAwards
 }
