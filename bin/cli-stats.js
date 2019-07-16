@@ -9,12 +9,12 @@ program
   .option('-w, --website <airline>', 'Limit parsing to the specified airline (IATA 2-letter code)')
   .parse(process.argv)
 
-async function processRows (type, routes, engine) {
+async function processRows (dbPool, type, routes, engine) {
   var rows = null
   if (type == 'requests') {
-    rows = await db.getAllRequestsForEngine(engine);
+    rows = await db.getAllRequestsForEngine(dbPool, engine);
   } else if (type == 'awards') {
-    rows = await db.getAllAwardsForEngine(engine);
+    rows = await db.getAllAwardsForEngine(dbPool, engine);
   } else {
     throw new Error('Cannot process specified type of row.');
   }
@@ -55,17 +55,16 @@ function increment (counts, request, index) {
 const main = async (args) => {
   const { website } = args
 
+  const dbPool = await db.createPool();
+
   try {
-    // // Open the database
-    // console.log('Opening database...')
-    // await db.open()
 
     // Iterate over requests and awards
     const routes = new Map()
     console.log('Analyzing requests table...')
-    const numRequests = await processRows('requests', routes, website)
+    const numRequests = await processRows(dbPool, 'requests', routes, website)
     console.log('Analyzing awards table...')
-    const numAwards = await processRows('awards', routes, website)
+    const numAwards = await processRows(dbPool, 'awards', routes, website)
 
     // Present stats
     console.log('')
@@ -111,7 +110,7 @@ const main = async (args) => {
     console.error(err)
     process.exit(1)
   } finally {
-    db.close()
+    dbPool.close()
   }
 }
 

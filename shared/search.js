@@ -111,13 +111,13 @@ function generateQueries (args, engine, days) {
     })
 
     return args.reverse ? queries.reverse() : queries
-    }
+}
 
-    async function redundant (query) {
+async function redundant (dbPool, query) {
     const { departDate, returnDate } = query
 
     // Lookup associated routes from database
-    const map = await routes.find(query)
+    const map = await routes.find(dbPool, query)
 
     // Get departures
     const departures = map.get(routes.key(query, departDate))
@@ -170,18 +170,13 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
     const engine = fp.new(args.website)
     let initialized = false
 
+    const dbPool = await db.createPool()
+
     try {
         // Create data path if necessary
         if (!fs.existsSync(paths.data)) {
             fs.mkdirSync(paths.data)
         }
-
-        // // Create database if necessary, and then open
-        // await db.migrate()
-        // await db.open()
-
-        if (customLogger) { customLogger("database opened."); }
-        else { console.log("database opened."); }
 
         // Setup engine options
         const options = { headless, proxy, docker, remotechrome }
@@ -205,7 +200,7 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
             const { id, loginRequired } = engine
 
             // Check if the query's results are already stored
-            if (!args.force && await redundant(query)) {
+            if (!args.force && await redundant(dbPool, query)) {
                 skipped++
                 continue
             }
@@ -268,13 +263,13 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
             }
 
             // Write request and awards (if parsed) to database
-            const requestId = await helpers.saveRequest(results);
+            const requestId = await helpers.saveRequest(dbPool, results);
             if (awards) {
                 if (awards.length > 0) {
                     daysRemaining = terminate // Reset termination counter
                 }
                 const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
-                await helpers.saveAwards(requestId, awards, placeholders)
+                await helpers.saveAwards(dbPool, requestId, awards, placeholders)
             }
         }
         if (skipped > 0) {
@@ -303,7 +298,7 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         return false
     } finally {
         await engine.close()
-        db.close()
+        dbPool.close()
     }
 }
 

@@ -21,27 +21,25 @@ var connectionConfig =
   }
 };
 
-async function getPool() {
-  if (typeof _pool === 'undefined' || !_pool) {
-    console.log(`Attempting to open database pool: ${paths.database}`);
-    _pool = new sql.ConnectionPool(connectionConfig);
-    await _pool.connect();
+async function createPool() {
+  console.log(`Attempting to open database pool: ${paths.database}`);
+  const pool = new sql.ConnectionPool(connectionConfig);
+  await pool.connect();
 
-    _pool.on('error', err => {
-      console.error(err);
-      throw err;
-    });
-  }
+  pool.on('error', err => {
+    console.error(err);
+    throw err;
+  });
 
-  return _pool;
+  return pool;
 }
 
-async function getRequestsWithoutAwards(engine, force) {
+async function getRequestsWithoutAwards(pool, engine, force) {
   // Select only those requests without corresponding entries in awards table
   let sql = force
     ? 'SELECT * FROM requests'
     : 'SELECT requests.* FROM requests LEFT JOIN awards ON requests.id = awards.requestId WHERE requestId IS NULL';
-  var pool = await getPool();
+  
   if (engine) {
     sql += `${force ? ' WHERE' : ' AND'} requests.engine = @engine`;
     return await pool.request().input('engine').query(sql);
@@ -50,13 +48,12 @@ async function getRequestsWithoutAwards(engine, force) {
   }
 }
 
-async function getRequestsForOW(route) {
+async function getRequestsForOW(pool, route) {
   
   // Format dates
   const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
   const departStr = departDate || null
 
-  var pool = await getPool();
   var result = await pool.request()
     .input('engine', sql.VarChar, engine)
     .input('partners', sql.Bit, partners ? 1 : 0)
@@ -73,13 +70,12 @@ async function getRequestsForOW(route) {
   return result.recordset;
 }
 
-async function getRequestsForRT(route) {
+async function getRequestsForRT(pool, route) {
   // Format dates
   const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
   const departStr = departDate || null
   const returnStr = returnDate || null
 
-  var pool = await getPool();
   var result = await pool.request()
     .input('engine', sql.VarChar, engine)
     .input('partners', sql.Bit, partners ? 1 : 0)
@@ -97,13 +93,12 @@ async function getRequestsForRT(route) {
     return result.recordset;
 }
 
-async function getAwardsForRT(route) {
+async function getAwardsForRT(pool, route) {
   // Format dates
   const { engine, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
   const departStr = departDate || null
   const returnStr = returnDate || null
 
-  var pool = await getPool();
   var result = await pool.request()
     .input('engine', sql.VarChar, engine)
     .input('cabin', sql.VarChar, cabin)
@@ -120,12 +115,11 @@ async function getAwardsForRT(route) {
   return result.recordset;
 }
 
-async function getAwardsForOW(route) {
+async function getAwardsForOW(pool, route) {
   // Format dates
   const { engine, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
   const departStr = departDate || null
 
-  var pool = await getPool();
   var result = await pool.request()
     .input('engine', sql.VarChar, engine)
     .input('cabin', sql.VarChar, cabin)
@@ -140,46 +134,40 @@ async function getAwardsForOW(route) {
   return result.recordset;
 }
 
-async function getAllRequests() {
-  var pool = await getPool();
+async function getAllRequests(pool) {
   var result = await pool.request()
     .query('SELECT * FROM requests');
   return result.recordset;
 }
 
-async function getAllAwards() {
-  var pool = await getPool();
+async function getAllAwards(pool) {
   var result = await pool.request()
     .query('SELECT * FROM awards');
   return result.recordset;
 }
 
-async function getSegments(awardId) {
-  var pool = await getPool();
+async function getSegments(pool, awardId) {
   var result = await pool.request()
     .input('awardId', sql.Int, awardId)
     .query('SELECT * FROM segments WHERE awardId = @awardId');
   return result.recordset;
 }
 
-async function cleanupRequest(requestId) {
-  var pool = await getPool();
+async function cleanupRequest(pool, requestId) {
   var result = await pool.request()
     .input('requestId', sql.Int, requestId)
     .query('DELETE FROM requests WHERE id = @requestId');
   return result.recordset;
 }
 
-async function getRequest(requestId) {
-  var pool = await getPool();
+async function getRequest(pool, requestId) {
   var result = await pool.request()
     .input('requestId', sql.Int, requestId)
     .query('SELECT * FROM requests WHERE id = @requestId');
   return result.recordset;
 }
 
-async function cleanupAwards(awards) {
-  var pool = await getPool();
+async function cleanupAwards(pool, awards) {
   const transaction = pool.transaction();
 
   transaction.begin(async transactionBeginErr => {
@@ -287,9 +275,8 @@ doSaveSegment[util.promisify.custom] = (transaction, awardId, position, row) => 
     doSaveSegment(transaction, awardId, position, row, resolve, reject);
   });
 };
-async function saveSegment(awardId, position, row) {
+async function saveSegment(pool, awardId, position, row) {
   var promisifiedSaveSegment = util.promisify(doSaveSegment);
-  var pool = await getPool();
   return await promisifiedSaveSegment(pool.transaction(), awardId, position, row);
 }
 
@@ -361,9 +348,8 @@ doSaveRequest[util.promisify.custom] = (transaction, row) => {
     doSaveRequest(transaction, row, resolve, reject);
   });
 };
-async function saveRequest(row) {
+async function saveRequest(pool, row) {
   var promisifiedSaveRequest = util.promisify(doSaveRequest);
-  var pool = await getPool();
   return await promisifiedSaveRequest(pool.transaction(), row);
 }
 
@@ -462,21 +448,20 @@ doSaveAward[util.promisify.custom] = (pool, requestId, row) => {
     doSaveAward(transaction, requestId, row, resolve, reject);
   });
 };
-async function saveAwards(requestId, rows) {
+async function saveAwards(pool, requestId, rows) {
   var promisifiedSaveAward = util.promisify(doSaveAward);
-  var pool = await getPool();
   for (const row of rows) {
     // if saving fails, promise is rejected and an exception *should* be thrown
     var segments = await promisifiedSaveAward(pool, requestId, row);
     if (segments) {
       for (let i=0; i<segments.length; i++) {
-        await saveSegment(segments[i].awardId, i, segments[i].segment);
+        await saveSegment(pool, segments[i].awardId, i, segments[i].segment);
       }
     }
   }
 }
 
-async function doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit) {
+async function doSearch(pool, fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit) {
 
   // Validate dates
   if (!utils.validDate(startDate)) {
@@ -489,7 +474,6 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
     throw new Error(`Invalid date range for search: ${startDate} -> ${endDate}`);
   }
 
-  var pool = await getPool();
   var awardsRequest = pool.request();
   var segmentsRequest = pool.request();
   let query = ' WHERE ';
@@ -559,9 +543,8 @@ async function doSearch(fromCity, toCity, quantity, direction, startDate, endDat
   return toReturn;
 }
 
-async function getAllRequestsForEngine(engine) {
+async function getAllRequestsForEngine(pool, engine) {
   let sql = `SELECT * FROM requests`;
-  var pool = await getPool();
   if (engine) {
     sql += ' WHERE engine = @engine';
     return await pool.request().input('engine', sql.VarChar, engine).query(sql);
@@ -570,9 +553,8 @@ async function getAllRequestsForEngine(engine) {
   }
 }
 
-async function getAllAwardsForEngine(engine) {
+async function getAllAwardsForEngine(pool, engine) {
   let sql = `SELECT * FROM awards`;
-  var pool = await getPool();
   if (engine) {
     sql += ' WHERE engine = @engine';
     return await pool.request().input('engine', sql.VarChar, engine).query(sql);
@@ -611,5 +593,6 @@ module.exports = {
   cleanupAwards, 
   doSearch, 
   close, 
-  migrate
+  migrate, 
+  createPool
 }

@@ -16,11 +16,12 @@ program
   .option('-m, --maxage', 'Discard requests older than specified age (supports ISO 8601 durations), defaults to 1 year')
   .parse(process.argv)
 
-async function cleanupResources (yes, verbose) {
+async function cleanupResources (dbPool, yes, verbose) {
+
   // Iterate over requests
   console.log('Scanning data resources...')
   const associatedFiles = new Set()
-  for (const row of await db.getAllRequests()) {
+  for (const row of await db.getAllRequests(dbPool)) {
     // Keep track of every file associated with a request
     helpers.assetsForRequest(row).forEach(x => associatedFiles.add(x))
   }
@@ -61,10 +62,10 @@ async function cleanupResources (yes, verbose) {
   return { resources: [] }
 }
 
-async function cleanupRequests (yes, verbose) {
+async function cleanupRequests (dbPool, yes, verbose) {
   console.log('Scanning search requests...')
   const requests = []
-  for (const row of await db.getAllRequests()) {
+  for (const row of await db.getAllRequests(dbPool)) {
     // Check for any missing resources
     const assets = helpers.assetsForRequest(row)
     const missing = !!assets.find(x => !fs.existsSync(x))
@@ -88,7 +89,7 @@ async function cleanupRequests (yes, verbose) {
   if (yes || prompts.askYesNo(`Found ${requests.length} incomplete requests. Delete them from the database?`)) {
     console.log('Cleaning up database entries and associated resources...')
     for (const row of requests) {
-      await helpers.cleanupRequest(row)
+      await helpers.cleanupRequest(dbPool, row)
     }
     return { requests }
   }
@@ -136,7 +137,7 @@ async function cleanupRedundant (yes, verbose, cutoff) {
   if (yes || prompts.askYesNo(`Found ${redundant.length} redundant requests. Delete them from the database?`)) {
     console.log('Cleaning up database entries and associated resources...')
     for (const row of redundant) {
-      await helpers.cleanupRequest(row)
+      await helpers.cleanupRequest(dbPool, row)
     }
     return { redundant }
   }
@@ -146,16 +147,14 @@ async function cleanupRedundant (yes, verbose, cutoff) {
 const main = async (args) => {
   const { yes, verbose, maxage = 'P1Y' } = args
 
-  try {
-    // // Open the database
-    // console.log('Opening database...')
-    // await db.open()
+  const dbPool = await db.createPool();
 
+  try {
     // Cleanup resources
-    const { resources } = await cleanupResources(yes, verbose)
+    const { resources } = await cleanupResources(dbPool, yes, verbose)
 
     // Cleanup requests
-    const { requests } = await cleanupRequests(yes, verbose)
+    const { requests } = await cleanupRequests(dbPool, yes, verbose)
 
     // Cleanup redundant requests
     const cutoff = moment.utc().subtract(moment.duration(maxage))
@@ -172,7 +171,7 @@ const main = async (args) => {
     console.error(err)
     process.exit(1)
   } finally {
-    db.close()
+    dbPool.close()
   }
 }
 

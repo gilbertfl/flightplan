@@ -58,7 +58,7 @@ app.get('/api/search', async (req, res, next) => {
 
     console.time('search')
 
-    let awards = await db.doSearch(fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit, remotechrome, credentials)
+    let awards = await db.doSearch(this.dbPool, fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit, remotechrome, credentials)
 
     console.timeEnd('search')
 
@@ -70,9 +70,7 @@ app.get('/api/search', async (req, res, next) => {
 
 const main = async () => {
   try {
-    // // Open database
-    // console.log('Opening database...')
-    // await db.open()
+    this.dbPool = await db.createPool();
 
     // Launch Express server
     console.log(`Running web server on port: ${port}`)

@@ -45,7 +45,7 @@ function assetsForRequest (request) {
   return [...html, ...json, ...screenshot].map(x => x.path)
 }
 
-async function cleanupRequest (request) {
+async function cleanupRequest (dbPool, request) {
   // Delete assets from disk
   for (const filename of assetsForRequest(request)) {
     if (fs.existsSync(filename)) {
@@ -54,11 +54,11 @@ async function cleanupRequest (request) {
   }
 
   // Remove from the database
-  await db.cleanupRequest(request.id);
+  await db.cleanupRequest(dbPool, request.id);
 }
 
-async function cleanupAwards (awards) {
-  await db.cleanupAwards(awards);
+async function cleanupAwards (dbPool, awards) {
+  await db.cleanupAwards(dbPool, awards);
 }
 
 function loadRequest (row) {
@@ -78,7 +78,7 @@ function loadRequest (row) {
   })
 }
 
-async function saveRequest (results) {
+async function saveRequest (dbPool, results) {
   // Get assets (only needs to have paths)
   const { assets } = results.trimContents()
 
@@ -97,10 +97,10 @@ async function saveRequest (results) {
   }
 
   // Insert the row
-  return await db.saveRequest(row);
+  return await db.saveRequest(dbPool, row);
 }
 
-async function saveAwards (requestId, awards, placeholders) {
+async function saveAwards (dbPool, requestId, awards, placeholders) {
   
 
   // Transform objects to rows
@@ -124,10 +124,10 @@ async function saveAwards (requestId, awards, placeholders) {
     })
   }
 
-  await db.saveAwards(requestId, rows);
+  await db.saveAwards(dbPool, requestId, rows);
 }
 
-async function saveSegment (awardId, position, segment) {
+async function saveSegment (dbPool, awardId, position, segment) {
   // Build the row data
   const row = {
     airline: segment.airline,
@@ -148,7 +148,7 @@ async function saveSegment (awardId, position, segment) {
   row.position = position
 
   // Save the individual award and get it's ID
-  return await db.saveSegment(row);
+  return await db.saveSegment(dbPool, row);
 }
 
 module.exports = {

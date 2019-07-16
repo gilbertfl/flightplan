@@ -14,27 +14,21 @@ program
   .option('--force', 'Re-parse requests, even if they have already been parsed previously')
   .parse(process.argv)
 
-async function getRequests (engine, force) {
-  return await db.getRequestsWithoutAwards(engine, force);
-}
-
 const main = async (args) => {
   const { verbose, yes, force } = args
   let numRequests = 0
   let numAwards = 0
 
-  try {
-    // // Open the database
-    // logger.info('Opening database...')
-    // await db.open()
+  const dbPool = await db.createPool();
 
+  try {
     // Iterate over search requests
     logger.info('Parsing search requests...')
     const failed = []
-    for (const row of await getRequests(args.website, force)) {
+    for (const row of await db.getRequestsWithoutAwards(dbPool, args.website, force)) {
       // First delete all awards associated with this request
-      const oldAwards = await db.getRequest(row.id);
-      helpers.cleanupAwards(oldAwards)
+      const oldAwards = await db.getRequest(dbPool, row.id);
+      helpers.cleanupAwards(dbPool, oldAwards)
 
       // Create a Results instance from the row
       const results = helpers.loadRequest(row)
@@ -67,7 +61,7 @@ const main = async (args) => {
 
       // Update the database
       const placeholders = helpers.createPlaceholders(results, { cabins: Object.values(fp.cabins) })
-      await helpers.saveAwards(row.id, awards, placeholders)
+      await helpers.saveAwards(dbPool, row.id, awards, placeholders)
       numAwards += awards.length
     }
 
@@ -75,7 +69,7 @@ const main = async (args) => {
       if (yes || prompts.askYesNo(`${failed.length} failed requests will be purged from the database. Do you want to continue?`)) {
         logger.info('Cleaning up stored files and database entries...')
         for (const row of failed) {
-          await helpers.cleanupRequest(row)
+          await helpers.cleanupRequest(dbPool, row)
         }
       }
     }

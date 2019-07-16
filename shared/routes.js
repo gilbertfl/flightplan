@@ -1,8 +1,7 @@
 const chalk = require('chalk');
 
-const db = require('./db');
+const db = require('./db'); 
 const paths = require('./paths');
-
 
 function path (route) {
   const { engine, fromCity, toCity, departDate } = route
@@ -30,11 +29,11 @@ function getOrSet (map, key) {
   return ret
 }
 
-async function find (route) {
+async function find (dbPool, route) {
   const map = new Map()
 
   // Update map with award requests
-  for (const row of await requests(route)) {
+  for (const row of await requests(dbPool, route)) {
     const { departDate, returnDate } = row
     let obj = getOrSet(map, key(row, departDate))
     obj.requests.push(row)
@@ -45,7 +44,7 @@ async function find (route) {
   }
 
   // Now update with awards
-  for (const row of await awards(route)) {
+  for (const row of await awards(dbPool, route)) {
     let obj = getOrSet(map, key(row, row.date))
     obj.awards.push(row)
   }
@@ -54,26 +53,26 @@ async function find (route) {
 }
 
 
-async function requests (route) {
+async function requests (dbPool, route) {
   // If no route defined, just select all records
   if (!route) {
-    return await db.getAllRequests();
+    return await db.getAllRequests(dbPool);
   }
 
   const { engine, partners, cabin, quantity, fromCity, toCity, departDate, returnDate } = route
 
   // Select only the relevant segments
   if (returnDate) {
-    return await db.getRequestsForRT(route);
+    return await db.getRequestsForRT(dbPool, route);
   } else {
-    return await db.getRequestsForOW(route);
+    return await db.getRequestsForOW(dbPool, route);
   }
 }
 
-async function awards (route) {
+async function awards (dbPool, route) {
   // If no route defined, just select all records
   if (!route) {
-    return await db.getAllAwards();
+    return await db.getAllAwards(dbPool);
   }
 
   // Format dates
@@ -84,10 +83,10 @@ async function awards (route) {
   // Select only the relevant segments
   if (returnDate) {
     // Round-Trip route
-    return await db.getAwardsForRT(route);
+    return await db.getAwardsForRT(dbPool, route);
   } else {
     // One-Way route
-    return await db.getAwardsForOW(route);
+    return await db.getAwardsForOW(dbPool, route);
   }
 }
 
