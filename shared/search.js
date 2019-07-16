@@ -180,9 +180,8 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         // await db.migrate()
         // await db.open()
 
-        if (customLogger) {
-            customLogger("database opened.");
-        }
+        if (customLogger) { customLogger("database opened."); }
+        else { console.log("database opened."); }
 
         // Setup engine options
         const options = { headless, proxy, docker, remotechrome }
@@ -198,7 +197,10 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         let skipped = 0
         let daysRemaining = terminate
         let lastDate = null
-        console.log(`Searching ${days} days of award inventory: ${timetable.format(startDate)} - ${timetable.format(endDate)}`)
+        
+        if (customLogger) { customLogger(`Searching ${days} days of award inventory: ${timetable.format(startDate)} - ${timetable.format(endDate)}`); }
+        else { console.log(`Searching ${days} days of award inventory: ${timetable.format(startDate)} - ${timetable.format(endDate)}`); }
+
         for (const query of queries) {
             const { id, loginRequired } = engine
 
@@ -213,7 +215,8 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
                 daysRemaining--
                 lastDate = query.departDate
                 if (daysRemaining < 0) {
-                    console.log(`Terminating search after no award inventory found for ${terminate} days.`)
+                    if (customLogger) { customLogger(`Terminating search after no award inventory found for ${terminate} days.`); }
+                    else { console.log(`Terminating search after no award inventory found for ${terminate} days.`); }
                 }
             }
 
@@ -237,7 +240,10 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
                 }
             } catch (err) {
                 engine.error('Unexpected error occurred while searching!')
-                console.error(err)
+
+                if (customLogger) { customLogger(err); }
+                else { console.error(err); }
+                
                 continue
             }
 
@@ -253,7 +259,10 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
                 engine.success(`Found: ${awards.length} awards, ${results.flights.length} flights`)
                 } catch (err) {
                     engine.error('Unexpected error occurred while parsing!')
-                    console.error(err)
+                    
+                    if (customLogger) { customLogger(err); }
+                    else { console.error(err); }
+
                     continue
                 }
             }
@@ -269,14 +278,24 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
             }
         }
         if (skipped > 0) {
-            console.log(`Skipped ${skipped} queries.`)
+            if (customLogger) { customLogger(`Skipped ${skipped} queries.`); }
+            else { console.log(`Skipped ${skipped} queries.`); }
         }
-        logger.success('Search complete!')
+
+        if (customLogger) { customLogger('Search complete!'); }
+        else { logger.success('Search complete!'); }
+
         return true
     } catch (err) {
-        engine ? engine.error('A fatal error occurred!') : logger.error('A fatal error occurred!')
+        if (engine) {
+            engine.error('A fatal error occurred!')
+        } else {
+            if (customLogger) { customLogger('A fatal error occurred!'); }
+            else { logger.error('A fatal error occurred!'); }
+        }
         if (err) {
-            console.error(err)
+            if (customLogger) { customLogger(err); }
+            else { console.error(err); }
         }
         if (!handleExceptions) {
             throw err
