@@ -350,8 +350,8 @@ class Searcher {
     return this._engine.config
   }
 
-  get browser () {
-    return this._engine.browser
+  get browsercontext () {
+    return this._engine.browsercontext
   }
 
   get page () {
