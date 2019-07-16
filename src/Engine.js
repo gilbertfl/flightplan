@@ -81,7 +81,8 @@ class Engine {
     }
 
     // Setup browser and new page
-    this._state.browsercontext = await this._newBrowserContext(this._state.remotechrome)
+    this._state.browser = await this._newBrowser(this._state.remotechrome)
+    this._state.browsercontext = await this._newBrowserContext(this._state.browser)
     const page = (await this._state.browsercontext.pages())[0]
     this._state.page = await this._newPage(page)
 
@@ -142,24 +143,21 @@ class Engine {
   }
 
   async close () {
-    const { browsercontext } = this._state
-    const remotechrome = this._state.remotechrome || ""
+    const { browsercontext, browser, remotechrome } = this._state
     if (browsercontext) {
       browsercontext.close();
       this._state.browsercontext = null
+    }
+    if (browser) {
+      if (remotechrome !== "") {
+        await browser.disconnect()
+      } else {
+        await browser.close()
+      }
+      this._state.browser = null
       this._state.page = null
       this._state.closed = true
     }
-    // if (browser) {
-    //   if (remotechrome !== "") {
-    //     await browser.disconnect()
-    //   } else {
-    //     await browser.close()
-    //   }
-    //   this._state.browser = null
-    //   this._state.page = null
-    //   this._state.closed = true
-    // }
   }
 
   get id () {
@@ -174,6 +172,10 @@ class Engine {
     return this._state.loginRequired
   }
 
+  get browser () {
+    return this._state.browser
+  }
+
   get browsercontext () {
     return this._state.browsercontext
   }
@@ -186,7 +188,7 @@ class Engine {
     this._state.page = newPage
   }
 
-  async _newBrowserContext (remoteAddress = "") {
+  async _newBrowser(remoteAddress = "") {
     // Create a new browser incognito context
     const { headless, args, proxy, docker, defaultViewport } = this._state
     if (proxy) {
@@ -199,34 +201,27 @@ class Engine {
     if (remoteAddress === "") {
       const browser = await puppeteer.launch({ headless, args, defaultViewport })
 
-      // // Ensure that new tabs cannot be opened
-      // await browser.on('targetcreated', (target) => {
-      //   if (target.type() === 'page') {
-      //     target.page().then(page => page.close())
-      //   }
-      // })
+      // Ensure that new tabs cannot be opened
+      await browser.on('targetcreated', (target) => {
+        if (target.type() === 'page') {
+          target.page().then(page => page.close())
+        }
+      })
 
-      const browserContext = await browser.createIncognitoBrowserContext()
-
-      return browserContext
+      return browser
     } else {
       // remote headless chrome is to be used instead, so just connect :-)
       const browser = await puppeteer.connect({ 
         browserWSEndpoint: remoteAddress,  
         defaultViewport: defaultViewport
       })
-
-      // // TODO: do we even care about remote new tabs?
-      // await browser.on('targetcreated', (target) => {
-      //   if (target.type() === 'page') {
-      //     target.page().then(page => page.close())
-      //   }
-      // })
-
-      const browserContext = await browser.createIncognitoBrowserContext()
-
-      return browserContext
+      
+      return browser
     }
+  }
+
+  async _newBrowserContext (browser) {
+    return await browser.createIncognitoBrowserContext()
   }
 
   async _newPage (page) {

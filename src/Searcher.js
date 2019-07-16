@@ -354,6 +354,10 @@ class Searcher {
     return this._engine.browsercontext
   }
 
+  get browser () {
+    return this._engine.browser
+  }
+
   get page () {
     return this._engine.page
   }
