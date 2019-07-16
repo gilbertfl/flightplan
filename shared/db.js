@@ -25,7 +25,9 @@ async function getPool() {
   if (typeof _pool === 'undefined' || !_pool) {
     console.log(`Attempting to open database pool: ${paths.database}`);
     _pool = new sql.ConnectionPool(connectionConfig);
-    await _pool.connect(err => {
+    await _pool.connect();
+
+    _pool.on('error', err => {
       console.error(err);
       throw err;
     });
