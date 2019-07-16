@@ -59,7 +59,8 @@ class Engine {
       verbose = true,
       cookies,
       evasions = {}, 
-      remotechrome = ""
+      remotechrome = "", 
+      incognito = false
     } = options
 
     // Save options
@@ -77,12 +78,13 @@ class Engine {
       verbose,
       cookies,
       evasions, 
-      remotechrome
+      remotechrome, 
+      incognito
     }
 
     // Setup browser and new page
     this._state.browser = await this._newBrowser(this._state.remotechrome)
-    this._state.browsercontext = await this._newBrowserContext(this._state.browser)
+    this._state.browsercontext = await this._newBrowserContext(this._state.browser, this._state.incognito)
     const page = (await this._state.browsercontext.pages())[0]
     this._state.page = await this._newPage(page)
 
@@ -143,9 +145,12 @@ class Engine {
   }
 
   async close () {
-    const { browsercontext, browser, remotechrome } = this._state
+    const { browsercontext, browser, remotechrome, incognito } = this._state
     if (browsercontext) {
-      browsercontext.close();
+      // default browser contexts cannot be closed
+      if (incognito) {
+        browsercontext.close();
+      }
       this._state.browsercontext = null
     }
     if (browser) {
@@ -215,13 +220,17 @@ class Engine {
         browserWSEndpoint: remoteAddress,  
         defaultViewport: defaultViewport
       })
-      
+
       return browser
     }
   }
 
-  async _newBrowserContext (browser) {
-    return await browser.createIncognitoBrowserContext()
+  async _newBrowserContext (browser, incognito) {
+    if (incognito) {
+      return await browser.createIncognitoBrowserContext()
+    } else {
+      return await browser.defaultBrowserContext()
+    }
   }
 
   async _newPage (page) {

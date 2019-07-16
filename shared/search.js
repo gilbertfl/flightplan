@@ -163,6 +163,7 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         terminate,
         debug: debugPort, 
         remotechrome, 
+        incognito, 
         credentials: credentialsToOverride
       } = args
 
@@ -179,7 +180,7 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         }
 
         // Setup engine options
-        const options = { headless, proxy, docker, remotechrome }
+        const options = { headless, proxy, docker, remotechrome, incognito }
         if (debugPort) {
             options.args = [ `--remote-debugging-port=${debugPort}` ]
         }

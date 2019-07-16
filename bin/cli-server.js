@@ -53,12 +53,13 @@ app.get('/api/search', async (req, res, next) => {
       cabin,
       limit, 
       remotechrome = '', 
+      incognito = false, 
       credentials = ''
     } = req.query
 
     console.time('search')
 
-    let awards = await db.doSearch(this.dbPool, fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit, remotechrome, credentials)
+    let awards = await db.doSearch(this.dbPool, fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit, remotechrome, incognito, credentials)
 
     console.timeEnd('search')
 
