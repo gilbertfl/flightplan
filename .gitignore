@@ -74,3 +74,4 @@ docker-compose.yml
 .DS_Store
 launch.json
 *-lock.json
+.nvmrc
