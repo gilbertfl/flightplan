@@ -201,6 +201,8 @@ class Engine {
     }
     if (docker) {
       args.push('--no-sandbox', '--headless', '--disable-dev-shm-usage')
+    } else {
+      args.push('--no-sandbox')
     }
 
     if (remoteAddress === "") {

@@ -28,6 +28,12 @@ module.exports = class extends Searcher {
     }
     await this.clickAndWait('button.btn-primary.form-login-submit')
 
+    // aeroplans new website is SUPER slow, and navigates multiple times before login dance is done
+    //  so the hacky workaround is to just wait...
+    await page.waitFor(10000)
+
+    // TODO: check if the "verify your email" dialog is appearing for new accounts, since it'll never work in that case...
+
     // Check for errors
     const msgError = await this.textContent('div.form-msg-box.has-error span.form-msg')
     if (msgError.includes('does not match our records')) {

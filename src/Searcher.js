@@ -160,7 +160,16 @@ class Searcher {
     return page.evaluate((values) => {
       for (var key in values) {
         if (values.hasOwnProperty(key)) {
-          const arr = document.getElementsByName(key)
+
+          // AC has same name both one-way and round-trip option buttons (tripTypeRoundTrip)
+          //  so for this, use value instead
+          var arr;
+          if (key=="tripTypeOneWay") {
+            arr = [ document.getElementById('tripTypeRoundTrip2') ]
+          } else {
+            arr = document.getElementsByName(key)
+          }
+          
           if (arr.length === 0) {
             throw new Error(`Missing form element: ${key}`)
           }
