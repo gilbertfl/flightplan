@@ -34,10 +34,10 @@
     "parse-duration": "^0.1.1",
     "puppeteer": "^1.20.0",
     "shelljs": "^0.8.3",
+    "sync-request": "6.1.0", 
     "prompt-sync": "^4.1.7",
     "timetable-fns": "^0.1.16",
-    "find-and": "latest",
-    "sync-request": "latest"
+    "find-and": "latest"
   },
   "devDependencies": {
     "concurrently": "^4.1.1",
