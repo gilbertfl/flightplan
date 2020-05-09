@@ -1,0 +1,66 @@
+
+# Variables needed:
+#   - azureSubscription
+#   - clientWebAppName
+#   - serverUrl
+
+trigger:
+- master
+
+stages:
+- stage: FlightPlan_Client
+  dependsOn: []
+  displayName: 'FlightPlan Client'
+  jobs:
+  - job: Build_Client
+    displayName: 'Build Client'
+    timeoutInMinutes: 60
+    cancelTimeoutInMinutes: 2
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - download: none
+    - task: Npm@1
+      displayName: 'npm install client'
+      inputs:
+        workingDir: client
+        verbose: false
+    - task: Npm@1
+      displayName: 'npm build client'
+      inputs:
+        command: custom
+        workingDir: client
+        verbose: false
+        customCommand: 'run build'
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact: client'
+      inputs:
+        PathtoPublish: client/build
+        ArtifactName: client
+  - job: Deploy_Client
+    displayName: 'Deploy Client'
+    timeoutInMinutes: 60
+    cancelTimeoutInMinutes: 2
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: none
+    - download: current
+      artifact: 'client'
+    - bash: 'sed -i ''s@"/api@"$(serverUrl)/api@g'' $(Pipeline.Workspace)/client/static/js/main*.js'
+      displayName: 'Replace API URL with Specified Server URL'
+    - task: AzureRmWebAppDeployment@4
+      displayName: 'Azure App Service Deploy: flightplan-client'
+      inputs:
+        azureSubscription: '$(azureSubscription)'
+        WebAppName: '$(clientWebAppName)'
+        packageForLinux: '$(Pipeline.Workspace)/client'
+        enableCustomDeployment: true
+        DeploymentType: zipDeploy
+
+# - stage: FlightPlan_Server
+#   dependsOn: []
+#   displayName: 'FlightPlan Server'
+#   jobs:
+#   - job: 
