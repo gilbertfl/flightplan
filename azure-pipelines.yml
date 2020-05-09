@@ -40,6 +40,8 @@ stages:
         ArtifactName: client
   - job: Deploy_Client
     displayName: 'Deploy Client'
+    dependsOn: Build_Client
+    condition: succeeded('Build_Client')
     timeoutInMinutes: 60
     cancelTimeoutInMinutes: 2
     pool:
