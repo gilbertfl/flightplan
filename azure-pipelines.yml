@@ -63,8 +63,8 @@ stages:
         azureSubscription: '$(azureSubscription)'
         WebAppName: '$(clientWebAppName)'
         packageForLinux: '$(Pipeline.Workspace)/client'
-        enableCustomDeployment: true
-        DeploymentType: zipDeploy
+        # enableCustomDeployment: true
+        # DeploymentType: zipDeploy
 
 - stage: FlightPlan_Server
   dependsOn: []
@@ -91,6 +91,6 @@ stages:
         WebAppName: '$(serverWebAppName)'
         packageForLinux: '$(Pipeline.Workspace)'
         AppSettings: '-SQLSERVERURL $(SQLSERVERURL) -SQLUSER $(SQLUSER) -SQLPASS $(SQLPASS) -SQLDBNAME $(SQLDBNAME)'
-        enableCustomDeployment: true
-        DeploymentType: 'zipDeploy'
+        # enableCustomDeployment: true
+        # DeploymentType: 'zipDeploy'
     
