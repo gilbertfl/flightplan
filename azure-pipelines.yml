@@ -2,6 +2,7 @@
 # Variables needed:
 #   - azureSubscription
 #   - clientWebAppName
+#   - serverWebAppName
 #   - serverUrl
 
 trigger:
@@ -53,7 +54,7 @@ stages:
     - bash: 'sed -i ''s@"/api@"$(serverUrl)/api@g'' $(Pipeline.Workspace)/client/static/js/main*.js'
       displayName: 'Replace API URL with Specified Server URL'
     - task: AzureRmWebAppDeployment@4
-      displayName: 'Azure App Service Deploy: flightplan-client'
+      displayName: 'Azure App Service Deploy'
       inputs:
         azureSubscription: '$(azureSubscription)'
         WebAppName: '$(clientWebAppName)'
@@ -61,8 +62,28 @@ stages:
         enableCustomDeployment: true
         DeploymentType: zipDeploy
 
-# - stage: FlightPlan_Server
-#   dependsOn: []
-#   displayName: 'FlightPlan Server'
-#   jobs:
-#   - job: 
+- stage: FlightPlan_Server
+  dependsOn: []
+  displayName: 'FlightPlan Server'
+  jobs:
+  - job: Server
+    displayName: 'Server'
+    timeoutInMinutes: 60
+    cancelTimeoutInMinutes: 2
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - download: none
+    - task: Npm@1
+      inputs:
+        command: 'install'
+    - task: AzureRmWebAppDeployment@4
+      displayName: 'Azure App Service Deploy'
+      inputs:
+        azureSubscription: '$(azureSubscription)'
+        WebAppName: '$(serverWebAppName)'
+        packageForLinux: '$(Pipeline.Workspace)'
+        enableCustomDeployment: true
+        DeploymentType: zipDeploy
+    
