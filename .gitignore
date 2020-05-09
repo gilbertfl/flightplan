@@ -75,3 +75,5 @@ docker-compose.yml
 launch.json
 *-lock.json
 .nvmrc
+
+cookies.json
