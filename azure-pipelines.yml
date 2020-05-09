@@ -4,6 +4,10 @@
 #   - clientWebAppName
 #   - serverWebAppName
 #   - serverUrl
+#   - SQLSERVERURL
+#   - SQLUSER
+#   - SQLPASS
+#   - SQLDBNAME
 
 trigger:
 - master
@@ -81,9 +85,12 @@ stages:
     - task: AzureRmWebAppDeployment@4
       displayName: 'Azure App Service Deploy'
       inputs:
+        ConnectionType: 'AzureRM'
         azureSubscription: '$(azureSubscription)'
+        appType: 'webApp'
         WebAppName: '$(serverWebAppName)'
         packageForLinux: '$(Pipeline.Workspace)'
+        AppSettings: '-SQLSERVERURL $(SQLSERVERURL) -SQLUSER $(SQLUSER) -SQLPASS $(SQLPASS) -SQLDBNAME $(SQLDBNAME)'
         enableCustomDeployment: true
-        DeploymentType: zipDeploy
+        DeploymentType: 'zipDeploy'
     
