@@ -21,6 +21,9 @@ class MissingCredentialsError extends SearcherError {
 class InvalidCredentialsError extends SearcherError {
   constructor () { super('INVALID_CREDENTIALS: Invalid login credentials') }
 }
+class InvalidVerificationCodeError extends SearcherError {
+  constructor () { super('INVALID_VERIFICATION_CODE: Invalid verification code') }
+}
 class InvalidRouteError extends SearcherError {
   constructor () { super('INVALID_ROUTE: Airline and its partners do not fly this route') }
 }

@@ -1,6 +1,6 @@
 const humanize = require('humanize-duration')
 const puppeteer = require('puppeteer')
-
+const fs = require('fs').promises;
 const Query = require('./Query')
 const Results = require('./Results')
 const Searcher = require('./Searcher')
@@ -87,6 +87,17 @@ class Engine {
     this._state.browsercontext = await this._newBrowserContext(this._state.browser, this._state.incognito)
     const page = (await this._state.browsercontext.pages())[0]
     this._state.page = await this._newPage(page)
+
+    // if there are any cookies to load, do so:
+    try {
+      const cookiesString = await fs.readFile('./cookies.json')
+      const cookies = JSON.parse(cookiesString)
+      await page.setCookie(...cookies)
+      this.info("Successfully loaded previously saved cookies into page on startup.")
+    } catch (err) {
+      // well, i guess we can't load cookies...
+      this.info("Could not load any cookies into page on startup.")
+    }
 
     // Make sure we can access the website
     await searcher.goto(config.searchURL, { referer: 'https://www.google.com/' })
@@ -206,7 +217,12 @@ class Engine {
     }
 
     if (remoteAddress === "") {
-      const browser = await puppeteer.launch({ headless, args, defaultViewport })
+      const browser = await puppeteer.launch({ 
+        headless, 
+        args, 
+        defaultViewport, 
+      //  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' 
+      })
 
       // Ensure that new tabs cannot be opened
       await browser.on('targetcreated', (target) => {

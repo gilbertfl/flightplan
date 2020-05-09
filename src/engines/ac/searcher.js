@@ -1,6 +1,6 @@
 const Searcher = require('../../Searcher')
 const { cabins } = require('../../consts')
-
+const fs = require('fs').promises;
 const { errors } = Searcher
 
 module.exports = class extends Searcher {
@@ -29,10 +29,48 @@ module.exports = class extends Searcher {
     await this.clickAndWait('button.btn-primary.form-login-submit')
 
     // aeroplans new website is SUPER slow, and navigates multiple times before login dance is done
-    //  so the hacky workaround is to just wait...
-    await page.waitFor(10000)
+    await page.waitFor(4000)
 
-    // TODO: check if the "verify your email" dialog is appearing for new accounts, since it'll never work in that case...
+    // is it waiting for a 2-factor code? if so, give us time to check email/phone and enter it manually
+    // TODO: if email, programmatically access email (via imap config, or gmail api, or whatever) and fill it in via code
+    const verificationCodeInput = await page.$('input[name=verification-code]')
+
+    // TODO: instead, ask for verification code in console somehow, and then use page.$type to fill it in on the web page
+
+    // if there is an input field and button asking for a verification code...
+    if (verificationCodeInput) {
+      // TODO: figure out xpath instead of "parent of parent"
+      const verificationCodeParent = (await verificationCodeInput.$x('..'))[0]
+      const verificationCodeParentOfParent = (await verificationCodeParent.$x('..'))[0]    
+      const verificationCodeSubmitButton = await verificationCodeParentOfParent.$('button.submit-button')
+
+      var buttonClicked = false
+      while (!buttonClicked) {
+        // has the full 6 digit code been entered yet? if so, submit it
+        const verificationCode = await page.$eval('input[name=verification-code]', el => el.value)
+        if (verificationCode != '' && verificationCode.length == 6) {
+          await verificationCodeSubmitButton.click({delay: 100})
+          buttonClicked = true
+        }
+        
+        // // TODO: we can't just call `.click()` on the button....seems like there is some js that needs to be manually triggered
+        // //  in addition to clicking the button.  
+        // const isStillAskingForCode = await page.$('input[name=verification-code]')
+        // if (!isStillAskingForCode) {
+        //   buttonClicked = true
+        // }
+
+        // wait a bit before trying the loop again
+        await page.waitFor(200)
+      }
+
+      // again, website is super slow, wait again....
+      await page.waitFor(2000)
+    }
+
+    // save cookies in json file somewhere
+    const cookies = await page.cookies();
+    await fs.writeFile('./cookies.json', JSON.stringify(cookies, null, 2));
 
     // Check for errors
     const msgError = await this.textContent('div.form-msg-box.has-error span.form-msg')
