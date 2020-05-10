@@ -4,6 +4,8 @@
 #   - clientWebAppName
 #   - serverWebAppName
 #   - serverUrl
+#   - resourceGroup
+#   - remoteChromeName
 #   - SQLSERVERURL
 #   - SQLUSER
 #   - SQLPASS
@@ -90,7 +92,29 @@ stages:
         appType: 'webApp'
         WebAppName: '$(serverWebAppName)'
         packageForLinux: '$(Pipeline.Workspace)'
-        AppSettings: '-SQLSERVERURL $(SQLSERVERURL) -SQLUSER $(SQLUSER) -SQLPASS $(SQLPASS) -SQLDBNAME $(SQLDBNAME)'
+        AppSettings: '-PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true -SQLSERVERURL $(SQLSERVERURL) -SQLUSER $(SQLUSER) -SQLPASS $(SQLPASS) -SQLDBNAME $(SQLDBNAME)'
         # enableCustomDeployment: true
         # DeploymentType: 'zipDeploy'
     
+- stage: Remote_Chrome_Docker
+  dependsOn: []
+  displayName: 'Remote Chrome Docker'
+  jobs:
+  - job: Server
+    displayName: 'Server'
+    timeoutInMinutes: 60
+    cancelTimeoutInMinutes: 2
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: none
+    - download: none
+    - task: AzurePowerShell@5
+      displayName: 'Create ACI'
+      inputs:
+        azureSubscription: '$(azureSubscription)'
+        ScriptType: 'InlineScript'
+        azurePowerShellVersion: 'LatestVersion'
+        pwsh: true
+        Inline: 'New-AzContainerGroup -ResourceGroupName $(resourceGroup) -Name $(remoteChromeName) -Image hub.docker.com/browserless/chrome:1.33-puppeteer-1.19.0 -OsType Linux -DnsNameLabel $(remoteChromeName)'
+        
