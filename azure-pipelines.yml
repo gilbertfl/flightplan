@@ -88,6 +88,10 @@ stages:
     - task: Npm@1
       inputs:
         command: 'install'
+    - task: CmdLine@2
+      displayName: 'DELETE ME: check directory'
+      inputs:
+        script: 'ls $(Pipeline.Workspace)'
     - task: AzureRmWebAppDeployment@4
       displayName: 'Azure App Service Deploy'
       inputs:
@@ -97,8 +101,8 @@ stages:
         WebAppName: '$(serverWebAppName)'
         packageForLinux: '$(Pipeline.Workspace)'
         AppSettings: '-PUPPETEER_SKIP_CHROMIUM_DOWNLOAD "true" -REMOTECHROME "http://$(remoteChromeName).$(location).azurecontainer.io:3000" -SQLSERVERURL "$(SQLSERVERURL)" -SQLUSER "$(SQLUSER)" -SQLPASS "$(SQLPASS)" -SQLDBNAME "$(SQLDBNAME)" -CREDENTIALS "$(CREDENTIALS)"'
-        # enableCustomDeployment: true
-        # DeploymentType: 'zipDeploy'
+        enableCustomDeployment: true
+        DeploymentType: 'zipDeploy'
     
 - stage: Remote_Chrome_Docker
   dependsOn: []
