@@ -119,5 +119,5 @@ stages:
         ScriptType: 'InlineScript'
         azurePowerShellVersion: 'LatestVersion'
         pwsh: true
-        Inline: 'New-AzContainerGroup -ResourceGroupName $(resourceGroup) -Name $(remoteChromeName) -Image hub.docker.com/browserless/chrome:1.33-puppeteer-1.19.0 -OsType Linux -DnsNameLabel $(remoteChromeName)'
+        Inline: 'New-AzContainerGroup -ResourceGroupName $(resourceGroup) -Name $(remoteChromeName) -Image https://hub.docker.com/browserless/chrome:1.33-puppeteer-1.19.0 -OsType Linux -DnsNameLabel $(remoteChromeName)'
         
