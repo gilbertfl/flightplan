@@ -91,7 +91,7 @@ stages:
     - task: CmdLine@2
       displayName: 'DELETE ME: check directory'
       inputs:
-        script: 'ls $(Pipeline.Workspace)'
+        script: 'ls $(Pipeline.Workspace)/s'
     - task: AzureRmWebAppDeployment@4
       displayName: 'Azure App Service Deploy'
       inputs:
@@ -99,7 +99,7 @@ stages:
         azureSubscription: '$(azureSubscription)'
         appType: 'webApp'
         WebAppName: '$(serverWebAppName)'
-        packageForLinux: '$(Pipeline.Workspace)'
+        packageForLinux: '$(Pipeline.Workspace)/s'
         AppSettings: '-PUPPETEER_SKIP_CHROMIUM_DOWNLOAD "true" -REMOTECHROME "http://$(remoteChromeName).$(location).azurecontainer.io:3000" -SQLSERVERURL "$(SQLSERVERURL)" -SQLUSER "$(SQLUSER)" -SQLPASS "$(SQLPASS)" -SQLDBNAME "$(SQLDBNAME)" -CREDENTIALS "$(CREDENTIALS)"'
         enableCustomDeployment: true
         DeploymentType: 'zipDeploy'
