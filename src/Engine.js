@@ -235,7 +235,8 @@ class Engine {
     } else {
       // remote headless chrome is to be used instead, so just connect :-)
       const browser = await puppeteer.connect({ 
-        browserWSEndpoint: remoteAddress,  
+        //browserWSEndpoint: remoteAddress,  
+        browserURL: remoteAddress, 
         defaultViewport: defaultViewport
       })
 

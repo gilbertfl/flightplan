@@ -173,6 +173,11 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         credentialsToUse = argCredentials
     }
 
+    remoteChromeToUse = process.env.REMOTECHROME
+    if (remotechrome) {
+        remoteChromeToUse = remotechrome
+    }
+
     // Create engine
     const engine = fp.new(args.website)
     let initialized = false
@@ -186,7 +191,7 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         }
 
         // Setup engine options
-        const options = { headless, proxy, docker, remotechrome, incognito }
+        const options = { headless, proxy, docker, remotechrome: remoteChromeToUse, incognito }
         if (debugPort) {
             options.args = [ `--remote-debugging-port=${debugPort}` ]
         }
