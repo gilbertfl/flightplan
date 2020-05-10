@@ -113,7 +113,7 @@ stages:
     steps:
     - checkout: none
     - download: none
-    - task: AzurePowerShell@5
+    - task: AzurePowerShell@4
       displayName: 'Create ACI'
       inputs:
         azureSubscription: '$(azureSubscription)'
