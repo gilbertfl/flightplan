@@ -533,34 +533,38 @@ async function saveAwards(pool, requestId, rows) {
         }
       });
     } else {
-      for (const row of rows) {
-        // if saving fails, promise is rejected and an exception *should* be thrown
-        var hrstart = process.hrtime();
-        var segments = await saveAward(/*pool*/ transaction, requestId, row);
-        var hrend = process.hrtime(hrstart);
-        console.info(`saveAward execution time (hr): ${hrend[0]}s ${(hrend[1] / 1000000)}ms`);
+      try {
+        for (const row of rows) {
+          // if saving fails, promise is rejected and an exception *should* be thrown
+          var hrstart = process.hrtime();
+          var segments = await saveAward(/*pool*/ transaction, requestId, row);
+          var hrend = process.hrtime(hrstart);
+          console.info(`saveAward execution time (hr): ${hrend[0]}s ${(hrend[1] / 1000000)}ms`);
 
-        
-        if (segments) {
-          // TODO: if we fix transactions (only 1 request can be executed at 1 time), then
-          //  we can go back to doing this to parallelize saving segments to speed it up!
+          
+          if (segments) {
+            // TODO: if we fix transactions (only 1 request can be executed at 1 time), then
+            //  we can go back to doing this to parallelize saving segments to speed it up!
 
-          // let segmentFns = [];
-          // for (let i=0; i<segments.length; i++) {
-          //   segmentFns.push(saveSegment(/*pool*/ transaction, segments[i].awardId, i, segments[i].segment));
-          // }
-          // await Promise.all(segmentFns);
+            // let segmentFns = [];
+            // for (let i=0; i<segments.length; i++) {
+            //   segmentFns.push(saveSegment(/*pool*/ transaction, segments[i].awardId, i, segments[i].segment));
+            // }
+            // await Promise.all(segmentFns);
 
-          for (let i=0; i<segments.length; i++) {
-              var hrsegstart = process.hrtime();
-              await saveSegment(/*pool*/ transaction, segments[i].awardId, i, segments[i].segment);
-              var hrsegend = process.hrtime(hrsegstart);
-              console.info(`saveSegment ${i} execution time (hr): ${hrsegend[0]}s ${(hrsegend[1] / 1000000)}ms`);
+            for (let i=0; i<segments.length; i++) {
+                var hrsegstart = process.hrtime();
+                await saveSegment(/*pool*/ transaction, segments[i].awardId, i, segments[i].segment);
+                var hrsegend = process.hrtime(hrsegstart);
+                console.info(`saveSegment ${i} execution time (hr): ${hrsegend[0]}s ${(hrsegend[1] / 1000000)}ms`);
+            }
           }
         }
-      }
 
-      await commitTransaction(transaction);
+        await commitTransaction(transaction);
+      } catch (e) {
+        console.error("SaveAwards encountered exception, transaction failed.", e);
+      }
     }
   });
 }
