@@ -12,7 +12,10 @@
 #   - SQLDBNAME
 
 trigger:
-- master
+  batch: true
+  branches:
+    include:
+    - master
 
 stages:
 - stage: FlightPlan_Client
