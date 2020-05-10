@@ -281,7 +281,10 @@ class Engine {
     const { searcher, page, loginRequired, credentials } = this._state
 
     if (!loginRequired) {
+      this.info('Login not required, continuing.')
       return true
+    } else {
+      this.info('Login required.')
     }
 
     let attempts = 0
