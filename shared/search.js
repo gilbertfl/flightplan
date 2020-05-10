@@ -167,6 +167,11 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         credentials: credentialsToOverride
       } = args
 
+    // we can also override credentials in environment variables in addition to args, so check there too
+    if (credentialsToOverride == "") {
+        credentialsToOverride = process.env.CREDENTIALS
+    }
+
     // Create engine
     const engine = fp.new(args.website)
     let initialized = false
