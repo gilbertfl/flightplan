@@ -104,8 +104,8 @@ stages:
   dependsOn: []
   displayName: 'Remote Chrome Docker'
   jobs:
-  - job: Server
-    displayName: 'Server'
+  - job: Browserless_Chrome_Instance
+    displayName: 'Browserless Chrome Instance'
     timeoutInMinutes: 60
     cancelTimeoutInMinutes: 2
     pool:
