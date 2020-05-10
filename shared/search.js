@@ -164,12 +164,13 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
         debug: debugPort, 
         remotechrome, 
         incognito, 
-        credentials: credentialsToOverride
+        credentials: argCredentials
       } = args
 
     // we can also override credentials in environment variables in addition to args, so check there too
-    if (credentialsToOverride == "") {
-        credentialsToOverride = process.env.CREDENTIALS
+    credentialsToUse = process.env.CREDENTIALS
+    if (argCredentials) {
+        credentialsToUse = argCredentials
     }
 
     // Create engine
@@ -224,7 +225,7 @@ async function searchWebsiteForAwards(args, handleExceptions = true, customLogge
             // Lazy load the search engine
             if (!initialized) {
                 const credentials = loginRequired
-                    ? accounts.getCredentials(id, args.account, credentialsToOverride) : null
+                    ? accounts.getCredentials(id, args.account, credentialsToUse) : null
                 await engine.initialize({ ...options, credentials })
                 initialized = true
             }
