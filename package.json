@@ -30,11 +30,11 @@
     "jspath": "^0.4.0",
     "moment": "^2.9.0",
     "moment-timezone": "^0.5.26",
-    "mssql": "^5.1.0",
+    "mssql": "^6.2.0",
     "parse-duration": "^0.1.1",
     "puppeteer": "^1.20.0",
     "shelljs": "^0.8.3",
-    "sync-request": "6.1.0", 
+    "sync-request": "6.1.0",
     "prompt-sync": "^4.1.7",
     "timetable-fns": "^0.1.16",
     "find-and": "latest"

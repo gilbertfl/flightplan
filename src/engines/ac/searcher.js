@@ -1,7 +1,18 @@
 const Searcher = require('../../Searcher')
 const { cabins } = require('../../consts')
-const fs = require('fs').promises;
+const readline = require('readline');
 const { errors } = Searcher
+
+const rl = readline.createInterface({ input: process.stdin , output: process.stdout });
+
+const getLine = (function () {
+    const getLineGen = (async function* () {
+        for await (const line of rl) {
+            yield line;
+        }
+    })();
+    return async () => ((await getLineGen.next()).value);
+})();
 
 module.exports = class extends Searcher {
   async isLoggedIn (page) {
@@ -29,6 +40,7 @@ module.exports = class extends Searcher {
     await this.clickAndWait('button.btn-primary.form-login-submit')
 
     // aeroplans new website is SUPER slow, and navigates multiple times before login dance is done
+    console.info("...waiting 4 seconds for aeroplans website to load before checking if we need to verify...")
     await page.waitFor(4000)
 
     // is it waiting for a 2-factor code? if so, give us time to check email/phone and enter it manually
@@ -39,48 +51,33 @@ module.exports = class extends Searcher {
 
     // if there is an input field and button asking for a verification code...
     if (verificationCodeInput) {
-      // TODO: figure out xpath instead of "parent of parent"
-      const verificationCodeParent = (await verificationCodeInput.$x('..'))[0]
-      const verificationCodeParentOfParent = (await verificationCodeParent.$x('..'))[0]    
-      const verificationCodeSubmitButton = await verificationCodeParentOfParent.$('button.submit-button')
+    
+      console.info("Please enter Aeroplan required 6-digit verification code (from email/sms).")
+      let verificationCode = await getLine();
 
-      var buttonClicked = false
-      while (!buttonClicked) {
-        // has the full 6 digit code been entered yet? if so, submit it
-        const verificationCode = await page.$eval('input[name=verification-code]', el => el.value)
-        if (verificationCode != '' && verificationCode.length == 6) {
-          await verificationCodeSubmitButton.click({delay: 100})
-          buttonClicked = true
-        }
-        
-        // // TODO: we can't just call `.click()` on the button....seems like there is some js that needs to be manually triggered
-        // //  in addition to clicking the button.  
-        // const isStillAskingForCode = await page.$('input[name=verification-code]')
-        // if (!isStillAskingForCode) {
-        //   buttonClicked = true
-        // }
+      if (verificationCode != '' && verificationCode.length == 6) {
 
-        // wait a bit before trying the loop again
-        await page.waitFor(200)
+        await this.enterText('input[name=verification-code]', verificationCode)
+
+        //await verificationCodeSubmitButton.click({delay: 100})
+        await this.clickAndWait('button.submit-button')
+      } else {
+        console.error("verification code " + verificationCode + " is invalid.")
+        throw new errors.InvalidVerificationCodeError()
       }
-
-      // again, website is super slow, wait again....
-      await page.waitFor(2000)
     }
+    
+    // // Check for errors
+    // const msgError = await this.textContent('div.form-msg-box.has-error span.form-msg')
+    // if (msgError.includes('does not match our records')) {
+    //   throw new errors.InvalidCredentials()
+    // }
+    // const msgError2 = await this.textContent('div.form-msg-box.error.form-main-msg span.form-msg')
+    // if (msgError2.includes('your account has been blocked')) {
+    //   throw new errors.BlockedAccount()
+    // }
 
-    // save cookies in json file somewhere
-    const cookies = await page.cookies();
-    await fs.writeFile('./cookies.json', JSON.stringify(cookies, null, 2));
-
-    // Check for errors
-    const msgError = await this.textContent('div.form-msg-box.has-error span.form-msg')
-    if (msgError.includes('does not match our records')) {
-      throw new errors.InvalidCredentials()
-    }
-    const msgError2 = await this.textContent('div.form-msg-box.error.form-main-msg span.form-msg')
-    if (msgError2.includes('your account has been blocked')) {
-      throw new errors.BlockedAccount()
-    }
+    console.info("login complete (NOTE: for now, no error checking).")
   }
 
   async search (page, query, results) {

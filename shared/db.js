@@ -34,6 +34,60 @@ async function createPool() {
   return pool;
 }
 
+// // returns true on successful transaction begin, false otherwise
+// function doBeginTransaction(transaction, resolve, reject) {
+//   transaction.begin(transactionBeginErr => {
+//     if (transactionBeginErr) {
+//       console.error("Save awards transaction failed to begin, rolling back.", transactionBeginErr);
+//       transaction.rollback(rollbackErr => {
+//         if (rollbackErr) {
+//           console.error("Could not roll back!", rollbackErr);
+//         }
+//         reject(false);
+//       });
+//     } else {
+//       resolve(true);
+//     }
+//   });
+// }
+// doBeginTransaction[util.promisify.custom] = (transaction) => {
+//   return new Promise((resolve, reject) => {
+//     doBeginTransaction(transaction, resolve, reject);
+//   });
+// };
+// async function beginTransaction(transaction) {
+//   var promisifiedTransactionBegin = util.promisify(doBeginTransaction);
+//   return await promisifiedTransactionBegin(transaction);
+// }
+
+function doCommitTransaction(transaction, resolve, reject) {
+  var hrcommitstart = process.hrtime();
+  transaction.commit(commitErr => {
+    if (commitErr) {
+      console.error("transaction commit failed, rolling back.", commitErr);
+      transaction.rollback(rollbackErr => {
+        if (rollbackErr) {
+          console.error("Could not roll back!", rollbackErr);
+        }
+      });
+      reject(commitErr);
+    } else {
+      var hrcommitend = process.hrtime(hrcommitstart);
+      console.info(`saveAwards transaction.commit execution time (hr): ${hrcommitend[0]}s ${(hrcommitend[1] / 1000000)}ms`);
+      resolve();
+    } 
+  });
+}
+doCommitTransaction[util.promisify.custom] = (transaction) => {
+  return new Promise((resolve, reject) => {
+    doCommitTransaction(transaction, resolve, reject);
+  });
+};
+async function commitTransaction(transaction) {
+  var promisifiedTransactionCommit = util.promisify(doCommitTransaction);
+  return await promisifiedTransactionCommit(transaction);
+}
+
 async function getRequestsWithoutAwards(pool, engine, force) {
   // Select only those requests without corresponding entries in awards table
   let sql = force
@@ -173,6 +227,7 @@ async function cleanupAwards(pool, awards) {
   transaction.begin(async transactionBeginErr => {
     if (transactionBeginErr) {
       console.error("save segment transaction failed to begin.", transactionBeginErr);
+      reject(transactionBeginErr);
     } else {
       try {
         for (const award of awards) {
@@ -190,10 +245,14 @@ async function cleanupAwards(pool, awards) {
             transaction.rollback(rollbackErr => {
               if (rollbackErr) {
                 console.error("Cleanup awards failed, and failed to roll back!", rollbackErr);
+                reject(rollbackErr);
               } else {
                 console.error("Cleanup awards failed, successfully rolled back.");
+                reject();
               }
             });
+          } else {
+            resolve();
           } 
         });
 
@@ -201,17 +260,20 @@ async function cleanupAwards(pool, awards) {
         console.error("Unhandled exception while saving segment.", e);
         transaction.rollback(err => {
           console.error("Unable to roll back on error during sql transaction!");
+          reject(e);
         });
       }
     }
   });
 }
 
+
 function doSaveSegment(transaction, awardId, position, row, resolve, reject) {
-  transaction.begin(transactionBeginErr => {
-    if (transactionBeginErr) {
-      console.error("save segment transaction failed to begin.", transactionBeginErr);
-    } else {
+  // transaction.begin(transactionBeginErr => {
+  //   if (transactionBeginErr) {
+  //     console.error("save segment transaction failed to begin.", transactionBeginErr);
+  //     reject(transactionBeginErr);
+  //   } else {
       try {
         transaction.request()
             .input('awardId', sql.Int, awardId)
@@ -243,42 +305,46 @@ function doSaveSegment(transaction, awardId, position, row, resolve, reject) {
                   reject(err);
                 });
               } else {
-                transaction.commit(commitErr => {
-                  if (commitErr) {
-                    console.error("transaction commit failed, rolling back.", commitErr);
-                    transaction.rollback(rollbackErr => {
-                      if (rollbackErr) {
-                        console.error("Save request failed, and failed to roll back!", rollbackErr);
-                      } else {
-                        console.error("Save request failed, successfully rolled back.");
-                      }
-                      reject(commitErr);
-                    });
-                  } else {
-                    var insertedRecordId = result.recordset[0].id;
-                    resolve(insertedRecordId);
-                  }
-                });
+                // transaction.commit(commitErr => {
+                //   if (commitErr) {
+                //     console.error("transaction commit failed, rolling back.", commitErr);
+                //     transaction.rollback(rollbackErr => {
+                //       if (rollbackErr) {
+                //         console.error("Save request failed, and failed to roll back!", rollbackErr);
+                //       } else {
+                //         console.error("Save request failed, successfully rolled back.");
+                //       }
+                //       reject(commitErr);
+                //     });
+                //   } else {
+                //     var insertedRecordId = result.recordset[0].id;
+                //     resolve(insertedRecordId);
+                //   }
+                // });
+                resolve();
               }
             });
       } catch (e) {
         console.error("Unhandled exception while saving segment.", e);
-        transaction.rollback(err => {
-          console.error("Unable to roll back on error during sql transaction!");
-        });
+        // transaction.rollback(err => {
+        //   console.error("Unable to roll back on error during sql transaction!");
+        //   reject(err);
+        // });
+        reject(e);
       }
-    }
-  });
+  //   }
+  // });
 }
 doSaveSegment[util.promisify.custom] = (transaction, awardId, position, row) => {
   return new Promise((resolve, reject) => {
     doSaveSegment(transaction, awardId, position, row, resolve, reject);
   });
 };
-async function saveSegment(pool, awardId, position, row) {
+async function saveSegment(/*pool*/ transaction, awardId, position, row) {
   var promisifiedSaveSegment = util.promisify(doSaveSegment);
-  return await promisifiedSaveSegment(pool.transaction(), awardId, position, row);
+  return await promisifiedSaveSegment(/*pool.transaction()*/ transaction, awardId, position, row);
 }
+
 
 function doSaveRequest(transaction, row, resolve, reject) {
   transaction.begin(transactionBeginErr => {
@@ -355,16 +421,16 @@ async function saveRequest(pool, row) {
 
 
 function doSaveAward(transaction, requestId, row, resolve, reject) {
-    transaction.begin(transactionBeginErr => {
-      if (transactionBeginErr) {
-        console.error("Save awards transaction failed to begin, rolling back.", transactionBeginErr);
-        transaction.rollback(rollbackErr => {
-          if (rollbackErr) {
-            console.error("Could not roll back!", rollbackErr);
-          }
-        });
-        reject(transactionBeginErr);
-      } else {
+    // transaction.begin(transactionBeginErr => {
+    //   if (transactionBeginErr) {
+    //     console.error("Save awards transaction failed to begin, rolling back.", transactionBeginErr);
+    //     transaction.rollback(rollbackErr => {
+    //       if (rollbackErr) {
+    //         console.error("Could not roll back!", rollbackErr);
+    //       }
+    //     });
+    //     reject(transactionBeginErr);
+    //   } else {
         try {
           const { segments } = row;
           delete row.segments;
@@ -399,18 +465,18 @@ function doSaveAward(transaction, requestId, row, resolve, reject) {
                 } else {
                   const awardId = result.recordset[0].id;
 
-                  // for now, commit each award separately
-                  transaction.commit(commitErr => {
-                    if (commitErr) {
-                      console.error("transaction commit failed, rolling back.", commitErr);
-                      transaction.rollback(rollbackErr => {
-                        if (rollbackErr) {
-                          console.error("Could not roll back!", rollbackErr);
-                        }
-                      });
-                      reject(commitErr);
-                    } 
-                  });
+                  // // for now, commit each award separately
+                  // transaction.commit(commitErr => {
+                  //   if (commitErr) {
+                  //     console.error("transaction commit failed, rolling back.", commitErr);
+                  //     transaction.rollback(rollbackErr => {
+                  //       if (rollbackErr) {
+                  //         console.error("Could not roll back!", rollbackErr);
+                  //       }
+                  //     });
+                  //     reject(commitErr);
+                  //   } 
+                  // });
 
                   // Now add each segment
                   // TODO: actually wait until transaction is committed to awards before doing this!!
@@ -431,34 +497,72 @@ function doSaveAward(transaction, requestId, row, resolve, reject) {
               });
         } catch (e) {
           console.error("unhandled exception while saving awards, rolling back.", e);
-          transaction.rollback(rollbackErr => {
-            if (rollbackErr) {
-              console.error("unhandled exception, and could not roll back!", rollbackErr);
-            }
-          });
+          // transaction.rollback(rollbackErr => {
+          //   if (rollbackErr) {
+          //     console.error("unhandled exception, and could not roll back!", rollbackErr);
+          //   }
+          // });
           reject(e);
         }
-      }
-    });
+    //   }
+    // });
   
 }
-doSaveAward[util.promisify.custom] = (pool, requestId, row) => {
+doSaveAward[util.promisify.custom] = (/*pool*/ transaction, requestId, row) => {
   return new Promise((resolve, reject) => {
-    const transaction = pool.transaction();
+    //const transaction = pool.transaction();
     doSaveAward(transaction, requestId, row, resolve, reject);
   });
 };
-async function saveAwards(pool, requestId, rows) {
+async function saveAward(/*pool*/ transaction, requestId, row) {
   var promisifiedSaveAward = util.promisify(doSaveAward);
-  for (const row of rows) {
-    // if saving fails, promise is rejected and an exception *should* be thrown
-    var segments = await promisifiedSaveAward(pool, requestId, row);
-    if (segments) {
-      for (let i=0; i<segments.length; i++) {
-        await saveSegment(pool, segments[i].awardId, i, segments[i].segment);
+  return await promisifiedSaveAward(/*pool*/ transaction, requestId, row);
+}
+
+
+async function saveAwards(pool, requestId, rows) {
+
+  // save all awards and associated segments in 1 transaction (separate transactions are sloooow)
+  const transaction = pool.transaction();
+  transaction.begin(async transactionBeginErr => {
+    if (transactionBeginErr) {
+      console.error("Save awards transaction failed to begin, rolling back.", transactionBeginErr);
+      transaction.rollback(rollbackErr => {
+        if (rollbackErr) {
+          console.error("Could not roll back!", rollbackErr);
+        }
+      });
+    } else {
+      for (const row of rows) {
+        // if saving fails, promise is rejected and an exception *should* be thrown
+        var hrstart = process.hrtime();
+        var segments = await saveAward(/*pool*/ transaction, requestId, row);
+        var hrend = process.hrtime(hrstart);
+        console.info(`saveAward execution time (hr): ${hrend[0]}s ${(hrend[1] / 1000000)}ms`);
+
+        
+        if (segments) {
+          // TODO: if we fix transactions (only 1 request can be executed at 1 time), then
+          //  we can go back to doing this to parallelize saving segments to speed it up!
+
+          // let segmentFns = [];
+          // for (let i=0; i<segments.length; i++) {
+          //   segmentFns.push(saveSegment(/*pool*/ transaction, segments[i].awardId, i, segments[i].segment));
+          // }
+          // await Promise.all(segmentFns);
+
+          for (let i=0; i<segments.length; i++) {
+              var hrsegstart = process.hrtime();
+              await saveSegment(/*pool*/ transaction, segments[i].awardId, i, segments[i].segment);
+              var hrsegend = process.hrtime(hrsegstart);
+              console.info(`saveSegment ${i} execution time (hr): ${hrsegend[0]}s ${(hrsegend[1] / 1000000)}ms`);
+          }
+        }
       }
+
+      await commitTransaction(transaction);
     }
-  }
+  });
 }
 
 async function doSearch(pool, fromCity, toCity, quantity, direction, startDate, endDate, cabin, limit) {

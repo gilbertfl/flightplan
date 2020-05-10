@@ -124,7 +124,13 @@ async function saveAwards (dbPool, requestId, awards, placeholders) {
     })
   }
 
-  await db.saveAwards(dbPool, requestId, rows);
+  try {
+    await db.saveAwards(dbPool, requestId, rows);
+  } catch (e) {
+    console.error("entire saveAwards called threw exception", e);
+    
+    // we don't rethrow so that the search will keep on going (this 1 day just won't get saved)
+  }
 }
 
 async function saveSegment (dbPool, awardId, position, segment) {

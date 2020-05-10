@@ -1,6 +1,6 @@
 const humanize = require('humanize-duration')
 const puppeteer = require('puppeteer')
-const fs = require('fs').promises;
+const fs = require('fs')
 const Query = require('./Query')
 const Results = require('./Results')
 const Searcher = require('./Searcher')
@@ -90,7 +90,7 @@ class Engine {
 
     // if there are any cookies to load, do so:
     try {
-      const cookiesString = await fs.readFile('./cookies.json')
+      const cookiesString = fs.readFileSync('./cookies.json')
       const cookies = JSON.parse(cookiesString)
       await page.setCookie(...cookies)
       this.info("Successfully loaded previously saved cookies into page on startup.")
@@ -283,8 +283,6 @@ class Engine {
     if (!loginRequired) {
       this.info('Login not required, continuing.')
       return true
-    } else {
-      this.info('Login required.')
     }
 
     let attempts = 0
@@ -297,6 +295,11 @@ class Engine {
       if (success || attempts >= retries) {
         if (attempts > 0) {
           success ? this.success('Login succeeded') : this.error('Login failed')
+        }
+        if (success) {
+          // save cookies in json file somewhere
+          const cookies = await page.cookies();
+          fs.writeFileSync('./cookies.json', JSON.stringify(cookies, null, 2));
         }
         return success
       }
