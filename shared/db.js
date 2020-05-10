@@ -536,10 +536,7 @@ async function saveAwards(pool, requestId, rows) {
       try {
         for (const row of rows) {
           // if saving fails, promise is rejected and an exception *should* be thrown
-          var hrstart = process.hrtime();
           var segments = await saveAward(/*pool*/ transaction, requestId, row);
-          var hrend = process.hrtime(hrstart);
-          console.info(`saveAward execution time (hr): ${hrend[0]}s ${(hrend[1] / 1000000)}ms`);
 
           
           if (segments) {
@@ -553,10 +550,7 @@ async function saveAwards(pool, requestId, rows) {
             // await Promise.all(segmentFns);
 
             for (let i=0; i<segments.length; i++) {
-                var hrsegstart = process.hrtime();
                 await saveSegment(/*pool*/ transaction, segments[i].awardId, i, segments[i].segment);
-                var hrsegend = process.hrtime(hrsegstart);
-                console.info(`saveSegment ${i} execution time (hr): ${hrsegend[0]}s ${(hrsegend[1] / 1000000)}ms`);
             }
           }
         }
