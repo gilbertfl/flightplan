@@ -123,5 +123,13 @@ stages:
         Inline: |
           # redeploy headless chrome as docker container instance
           Remove-AzContainerGroup -ResourceGroupName $(resourceGroup) -Name $(remoteChromeName)
-          New-AzContainerGroup -ResourceGroupName $(resourceGroup) -Name $(remoteChromeName) -Location $(location) -Image browserless/chrome:1.33-puppeteer-1.19.0 -OsType Linux -DnsNameLabel $(remoteChromeName) -MemoryInGB 1.5 -Cpu 1 -Port @(3000)
+          $envVars = @{
+            'CONNECTION_TIMEOUT'='180000';
+            'PREBOOT_CHROME'='true';
+            'KEEP_ALIVE'='true';
+            'CHROME_REFRESH_TIME'='360000';
+            'DEBUG'='browserless/chrome*';
+            'ENABLE_CORS'='true'
+          }
+          New-AzContainerGroup -ResourceGroupName $(resourceGroup) -Name $(remoteChromeName) -Location $(location) -Image browserless/chrome:1.33-puppeteer-1.19.0 -OsType Linux -DnsNameLabel $(remoteChromeName) -MemoryInGB 1.5 -Cpu 1 -Port @(3000) -EnvironmentVariable $envVars
         
