@@ -1,4 +1,5 @@
 const Searcher = require('../../Searcher')
+const emails = require('../../../shared/emails')
 const { cabins } = require('../../consts')
 const readline = require('readline');
 const { errors } = Searcher
@@ -40,8 +41,8 @@ module.exports = class extends Searcher {
     await this.clickAndWait('button.btn-primary.form-login-submit')
 
     // aeroplans new website is SUPER slow, and navigates multiple times before login dance is done
-    console.info("...waiting 4 seconds for aeroplans website to load before checking if we need to verify...")
-    await page.waitFor(4000)
+    console.info("...waiting 3 seconds for aeroplans website to load before checking if we need to verify...")
+    await page.waitFor(3000)
 
     // is it waiting for a 2-factor code? if so, give us time to check email/phone and enter it manually
     // TODO: if email, programmatically access email (via imap config, or gmail api, or whatever) and fill it in via code
@@ -50,10 +51,25 @@ module.exports = class extends Searcher {
     // TODO: instead, ask for verification code in console somehow, and then use page.$type to fill it in on the web page
 
     // if there is an input field and button asking for a verification code...
-    if (verificationCodeInput) {
     
-      console.info("Please enter Aeroplan required 6-digit verification code (from email/sms).")
-      let verificationCode = await getLine();
+    var verificationCode = "";
+    if (verificationCodeInput) {
+
+      // the automated way is to use email-based verification token if IMAP info is defined
+      //  (otherwise ask for it in the console)
+      if (process.env.IMAPHOST) {
+        var numTriesCheckingEmail = 0;
+        while (numTriesCheckingEmail < 20 && verificationCode == '') {
+          
+          await new Promise(r => setTimeout(r, 2000));
+
+          verificationCode = await emails.findVerificationCodeInEmail("info@communications.aeroplan.com");
+          numTriesCheckingEmail = numTriesCheckingEmail + 1;
+        }
+      } else {
+        console.info("Please enter Aeroplan required 6-digit verification code (from email/sms).")
+        verificationCode = await getLine();
+      }
 
       if (verificationCode != '' && verificationCode.length == 6) {
 
@@ -143,7 +159,7 @@ module.exports = class extends Searcher {
       throw new errors.InvalidRoute()
     }
 
-    // Wait up to 15 seconds to get the JSON from the browser itself
+    // Wait up to 60 seconds to get the JSON from the browser itself
     let json = null
     await this.attemptWhile(
       async () => { return !json },
@@ -151,7 +167,7 @@ module.exports = class extends Searcher {
         await page.waitFor(1000)
         json = await page.evaluate(() => this.results ? this.results.results : null)
       },
-      15,
+      60,
       new Searcher.Error(`Timed out waiting for JSON results to be created`)
     )
 
