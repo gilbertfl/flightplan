@@ -132,7 +132,8 @@ stages:
             'PREBOOT_CHROME'='true';
             'KEEP_ALIVE'='true';
             'CHROME_REFRESH_TIME'='3600000';
-            'DEBUG'='browserless/chrome*';
+            # 'DEBUG'='browserless/chrome*';
+            'DEBUG'='*';
             'ENABLE_CORS'='true'
           }
           New-AzContainerGroup -ResourceGroupName $(resourceGroup) -Name $(remoteChromeName) -Location $(location) -Image browserless/chrome:1.33-puppeteer-1.19.0 -OsType Linux -DnsNameLabel $(remoteChromeName) -MemoryInGB 1.5 -Cpu 1 -Port @(3000) -EnvironmentVariable $envVars
