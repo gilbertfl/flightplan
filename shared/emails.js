@@ -41,8 +41,8 @@ async function findVerificationCodeInEmail(fromEmail) {
   let mail = await simpleParser(idHeader+all.body);
   
   // access to the whole mail object
-  console.log(mail.subject);
-  console.log(mail.html);
+  console.log(`Found email with potential verification code: ${mail.subject}`);
+  //console.log(mail.html);
 
   // TODO: in mail.html, look for "<strong>VERIFICATION CODE: 900528</strong>" and parse the code out!
   const regex = /<strong>VERIFICATION CODE: ([0-9][0-9][0-9][0-9][0-9][0-9])<\/strong>/g;
