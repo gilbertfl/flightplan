@@ -48,11 +48,19 @@ async function findVerificationCodeInEmail(fromEmail) {
   const found = regex.exec(mail.html);
 
   // if the regex worked, the verification code is the 2nd item in the array
-  const verificationCode = found[1];
+  if (found && found.length > 1) {
+    const verificationCode = found[1];
+    console.log(`Found verification code within email. The verification code is: ${verificationCode}`);
 
-  console.log(`Found verification code within email. The verification code is: ${verificationCode}`);
+    // now delete email since we don't need it any more
+    await connection.deleteMessage(id);
 
-  return verificationCode;
+    return verificationCode;
+  }
+
+  // couldn't find verification code!
+  console.error(`Couldn't find verification code in email with subject: ${mail.subject}`);
+  return "";
 }
 
 module.exports = {
