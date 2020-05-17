@@ -81,6 +81,10 @@ module.exports = class extends Searcher {
         console.error("verification code " + verificationCode + " is invalid.")
         throw new errors.InvalidVerificationCodeError()
       }
+
+      // aeroplans new website is SUPER slow, and navigates multiple times before login dance is done
+      console.info("...waiting 3 more seconds for aeroplans website to load post-login...")
+      await page.waitFor(3000)
     }
     
     // // Check for errors
