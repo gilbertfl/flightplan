@@ -114,12 +114,13 @@ module.exports = class extends Searcher {
     var searchSuccess = false;
     var numAttempts = 0;
     while (!searchSuccess && numAttempts < 5) {
-
+      
       // Wait a few seconds for the form to auto-fill itself
       await page.waitFor(3000)
 
       // Fill out the form
       if (oneWay) {
+        console.debug(`starting 1-way search from ${fromCity} to ${toCity} on ${departDate}`);
         await this.fillForm({
           tripTypeRoundTrip: 'One-way', // note: this is a bug in aeroplans DOM, they named both inputs the same...
           currentTripTab: 'oneway',
@@ -135,6 +136,7 @@ module.exports = class extends Searcher {
           OnewayFlexibleDatesHidden: '0'
         })
       } else {
+        console.debug(`starting round-trip search from ${fromCity} to ${toCity} departing on ${departDate}, returning on ${returnDate}`);
         await this.fillForm({
           tripTypeRoundTrip: 'Round-Trip',
           currentTripTab: 'return',
@@ -159,14 +161,20 @@ module.exports = class extends Searcher {
         : 'travelFlightsRoundTripTab',
         { waitUntil: 'none' })
 
+      console.debug(`search form submitted, waiting for spinner.`);
+
       // Wait for results to load
       await this.monitor('.waiting-spinner-inner')
+
+      console.debug(`spinner finished.`);
 
       // Check for errors
       const msgError = await this.textContent('div.errorContainer')
       if (msgError.includes('itinerary is not eligible') || msgError.includes('itinerary cannot be booked')) {
         throw new errors.InvalidRoute()
       }
+
+      console.debug(`no errors found in search, will attempt to parse results.`);
 
       // Wait up to 60 seconds to get the JSON from the browser itself
       //  (used to use generic attemptWhile, but we needed to customize because ACs website is hot garbage)
@@ -186,12 +194,16 @@ module.exports = class extends Searcher {
           await results.saveJSON('results', json);
           await results.screenshot('results');
           
+          console.debug(`found results, search is a success, break out of the loop!`);
           searchSuccess = true;
           break; // Success!
         }
       }
 
       numAttempts++;
+      if (!searchSuccess) {
+        console.warn(`Unsuccessful search on attempt number ${numAttempts}!`);
+      }
     }
   }
 }
