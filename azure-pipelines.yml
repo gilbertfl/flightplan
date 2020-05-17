@@ -11,6 +11,11 @@
 #   - SQLUSER
 #   - SQLPASS
 #   - SQLDBNAME
+#   - IMAPHOST
+#   - IMAPUSER
+#   - IMAPPASS
+#   - IMAPPORT
+#   - IMAPTLS
 
 trigger:
   batch: true
@@ -100,7 +105,7 @@ stages:
         appType: 'webApp'
         WebAppName: '$(serverWebAppName)'
         packageForLinux: '$(Pipeline.Workspace)/s'
-        AppSettings: '-PUPPETEER_SKIP_CHROMIUM_DOWNLOAD "true" -REMOTECHROME "http://$(remoteChromeName).$(location).azurecontainer.io:3000" -SQLSERVERURL "$(SQLSERVERURL)" -SQLUSER "$(SQLUSER)" -SQLPASS "$(SQLPASS)" -SQLDBNAME "$(SQLDBNAME)" -CREDENTIALS "$(CREDENTIALS)"'
+        AppSettings: '-PUPPETEER_SKIP_CHROMIUM_DOWNLOAD "true" -REMOTECHROME "http://$(remoteChromeName).$(location).azurecontainer.io:3000" -SQLSERVERURL "$(SQLSERVERURL)" -SQLUSER "$(SQLUSER)" -SQLPASS "$(SQLPASS)" -SQLDBNAME "$(SQLDBNAME)" -CREDENTIALS "$(CREDENTIALS)" -IMAPHOST "$(IMAPHOST)" -IMAPUSER "$(IMAPUSER)" -IMAPPASS "$(IMAPPASS)" -IMAPPORT "$(IMAPPORT)" -IMAPTLS "$(IMAPTLS)"'
         enableCustomDeployment: true
         DeploymentType: 'zipDeploy'
     
