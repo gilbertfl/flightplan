@@ -8,7 +8,7 @@ var config = {
     password: process.env.IMAPPASS,
     host: process.env.IMAPHOST,
     port: Number(process.env.IMAPPORT),
-    tls: process.env.IMAPTLS.toLowerCase() == "true" ? true : false,
+    tls: process.env.IMAPTLS && process.env.IMAPTLS.toLowerCase() == "true" ? true : false,
     authTimeout: 3000
   }
 };
