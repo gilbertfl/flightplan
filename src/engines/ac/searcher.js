@@ -110,104 +110,91 @@ module.exports = class extends Searcher {
       ? ['Business/First', 'Business']
       : ['Eco/Prem', 'Economy']
 
-    // since aeroplan is super flaky, try multiple times to successfully get a result
-    var searchSuccess = false;
-    var numAttempts = 0;
-    while (!searchSuccess && numAttempts < 5) {
-      try {
-        // Wait a few seconds for the form to auto-fill itself
-        await page.waitFor(3000)
+    try {
+      // Wait a few seconds for the form to auto-fill itself
+      await page.waitFor(3000)
 
-        // Fill out the form
-        if (oneWay) {
-          console.debug(`starting 1-way search from ${fromCity} to ${toCity} on ${departDate}`);
-          await this.fillForm({
-            tripTypeRoundTrip: 'One-way', // note: this is a bug in aeroplans DOM, they named both inputs the same...
-            currentTripTab: 'oneway',
-            city1FromOnewayCode: fromCity,
-            city1ToOnewayCode: toCity,
-            l1Oneway: departDate.format('MM/DD/YYYY'),
-            l1OnewayDate: departDate.format('YYYY-MM-DD'),
-            OnewayCabinTextfield: cabinVals[0],
-            OnewayCabin: cabinVals[1],
-            OnewayAdultsNb: quantity.toString(),
-            OnewayChildrenNb: '0',
-            OnewayTotalPassengerNb: quantity.toString(),
-            OnewayFlexibleDatesHidden: '0'
-          })
-        } else {
-          console.debug(`starting round-trip search from ${fromCity} to ${toCity} departing on ${departDate}, returning on ${returnDate}`);
-          await this.fillForm({
-            tripTypeRoundTrip: 'Round-Trip',
-            currentTripTab: 'return',
-            city1FromReturnCode: fromCity,
-            city1ToReturnCode: toCity,
-            l1Return: departDate.format('MM/DD/YYYY'),
-            l1ReturnDate: departDate.format('YYYY-MM-DD'),
-            r1Return: returnDate.format('MM/DD/YYYY'),
-            r1ReturnDate: returnDate.format('YYYY-MM-DD'),
-            ReturnCabinTextfield: cabinVals[0],
-            ReturnCabin: cabinVals[1],
-            ReturnAdultsNb: '1',
-            ReturnChildrenNb: '0',
-            ReturnTotalPassengerNb: '1',
-            ReturnFlexibleDatesHidden: '0'
-          })
-        }
+      // Fill out the form
+      if (oneWay) {
+        console.debug(`starting 1-way search from ${fromCity} to ${toCity} on ${departDate}`);
+        await this.fillForm({
+          tripTypeRoundTrip: 'One-way', // note: this is a bug in aeroplans DOM, they named both inputs the same...
+          currentTripTab: 'oneway',
+          city1FromOnewayCode: fromCity,
+          city1ToOnewayCode: toCity,
+          l1Oneway: departDate.format('MM/DD/YYYY'),
+          l1OnewayDate: departDate.format('YYYY-MM-DD'),
+          OnewayCabinTextfield: cabinVals[0],
+          OnewayCabin: cabinVals[1],
+          OnewayAdultsNb: quantity.toString(),
+          OnewayChildrenNb: '0',
+          OnewayTotalPassengerNb: quantity.toString(),
+          OnewayFlexibleDatesHidden: '0'
+        })
+      } else {
+        console.debug(`starting round-trip search from ${fromCity} to ${toCity} departing on ${departDate}, returning on ${returnDate}`);
+        await this.fillForm({
+          tripTypeRoundTrip: 'Round-Trip',
+          currentTripTab: 'return',
+          city1FromReturnCode: fromCity,
+          city1ToReturnCode: toCity,
+          l1Return: departDate.format('MM/DD/YYYY'),
+          l1ReturnDate: departDate.format('YYYY-MM-DD'),
+          r1Return: returnDate.format('MM/DD/YYYY'),
+          r1ReturnDate: returnDate.format('YYYY-MM-DD'),
+          ReturnCabinTextfield: cabinVals[0],
+          ReturnCabin: cabinVals[1],
+          ReturnAdultsNb: '1',
+          ReturnChildrenNb: '0',
+          ReturnTotalPassengerNb: '1',
+          ReturnFlexibleDatesHidden: '0'
+        })
+      }
 
-        // Submit the form, and capture the AJAX response
-        await this.submitForm(oneWay
-          ? 'travelFlightsOneWayTab'
-          : 'travelFlightsRoundTripTab',
-          { waitUntil: 'none' })
+      // Submit the form, and capture the AJAX response
+      await this.submitForm(oneWay
+        ? 'travelFlightsOneWayTab'
+        : 'travelFlightsRoundTripTab',
+        { waitUntil: 'none' })
 
-        console.debug(`search form submitted, waiting for spinner.`);
+      console.debug(`search form submitted, waiting for spinner.`);
 
-        // Wait for results to load
-        await this.monitor('.waiting-spinner-inner')
+      // Wait for results to load
+      await this.monitor('.waiting-spinner-inner')
 
-        console.debug(`spinner finished.`);
+      console.debug(`spinner finished.`);
 
-        // Check for errors
-        const msgError = await this.textContent('div.errorContainer')
-        if (msgError.includes('itinerary is not eligible') || msgError.includes('itinerary cannot be booked')) {
-          throw new errors.InvalidRoute()
-        }
+      // Check for errors
+      const msgError = await this.textContent('div.errorContainer')
+      if (msgError.includes('itinerary is not eligible') || msgError.includes('itinerary cannot be booked')) {
+        throw new errors.InvalidRoute()
+      }
 
-        console.debug(`no errors found in search, will attempt to parse results.`);
+      console.debug(`no errors found in search, will attempt to parse results.`, new Date());
 
-        // Wait up to 20 seconds to get the JSON from the browser itself
-        //  (used to use generic attemptWhile, but we needed to customize because ACs website is hot garbage)
-        let getResultAttempts = 0;
-        while (getResultAttempts < 20) {
-          await page.waitFor(1000);
-          var json = await page.evaluate(() => {
-            if (this.results) {
-              return this.results.results;
-            } else {
-              return null;
-            }
-          });
-          getResultAttempts++
-          if (json) {
-            // Obtain the JSON from the browser itself, which will have calculated prices
-            await results.saveJSON('results', json);
-            await results.screenshot('results');
-            
-            console.debug(`found results, search is a success, break out of the loop!`);
-            searchSuccess = true;
-            break; // Success!
+      // Wait up to 20 seconds to get the JSON from the browser itself
+      //  (used to use generic attemptWhile, but we needed to customize because ACs website is hot garbage)
+      let getResultAttempts = 0;
+      while (getResultAttempts < 20) {
+        await page.waitFor(1000);
+        var json = await page.evaluate(() => {
+          if (this.results) {
+            return this.results.results;
+          } else {
+            return null;
           }
-        }
-      } catch (err) {
-        console.error(`exception while searching on attempt number ${numAttempts}: ${err}`);
-        searchSuccess = false;
-      } finally {
-        numAttempts++;
-        if (!searchSuccess) {
-          console.warn(`Unsuccessful search on attempt number ${numAttempts}!`);
+        });
+        getResultAttempts++
+        if (json) {
+          // Obtain the JSON from the browser itself, which will have calculated prices
+          await results.saveJSON('results', json);
+          await results.screenshot('results');
+          break; // Success!
         }
       }
+    } catch (err) {
+      console.error(`exception while searching AC!`, new Date());
+      console.error(err);
     }
   }
 }
