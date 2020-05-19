@@ -301,6 +301,14 @@ class Engine {
           // save cookies in json file somewhere
           const cookies = await page.cookies();
           fs.writeFileSync('./cookies.json', JSON.stringify(cookies, null, 2));
+        } else {
+          // we're not logged in - so just in case there were already cookies, they must be invalid, so delete them for next time.
+          try {
+            fs.unlinkSync('./cookies.json');
+          } catch (deleteErr) {
+            // don't care, just spit out warning so we can debug
+            this.info("Exception while attempting to delete cookies file!", deleteErr);
+          }
         }
         return success
       }
