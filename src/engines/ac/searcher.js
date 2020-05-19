@@ -116,7 +116,7 @@ module.exports = class extends Searcher {
 
       // Fill out the form
       if (oneWay) {
-        console.debug(`starting 1-way search from ${fromCity} to ${toCity} on ${departDate}`);
+        // console.debug(`starting 1-way search from ${fromCity} to ${toCity} on ${departDate}`);
         await this.fillForm({
           tripTypeRoundTrip: 'One-way', // note: this is a bug in aeroplans DOM, they named both inputs the same...
           currentTripTab: 'oneway',
@@ -132,7 +132,7 @@ module.exports = class extends Searcher {
           OnewayFlexibleDatesHidden: '0'
         })
       } else {
-        console.debug(`starting round-trip search from ${fromCity} to ${toCity} departing on ${departDate}, returning on ${returnDate}`);
+        // console.debug(`starting round-trip search from ${fromCity} to ${toCity} departing on ${departDate}, returning on ${returnDate}`);
         await this.fillForm({
           tripTypeRoundTrip: 'Round-Trip',
           currentTripTab: 'return',
@@ -157,12 +157,10 @@ module.exports = class extends Searcher {
         : 'travelFlightsRoundTripTab',
         { waitUntil: 'none' })
 
-      console.debug(`search form submitted, waiting for spinner.`);
-
       // Wait for results to load
       await this.monitor('.waiting-spinner-inner')
 
-      console.debug(`spinner finished.`);
+      console.debug(`search form submitted, spinner finished.`);
 
       // Check for errors
       const msgError = await this.textContent('div.errorContainer')
