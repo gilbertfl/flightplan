@@ -7,6 +7,7 @@ var config = {
     user: process.env.IMAPUSER,
     password: process.env.IMAPPASS,
     host: process.env.IMAPHOST,
+    tlsOptions: { servername: process.env.IMAPHOST }, // fixes DEPTH_ZERO_SELF_SIGNED_CERT error in windows because https://github.com/nodejs/node/issues/28167
     port: Number(process.env.IMAPPORT),
     tls: process.env.IMAPTLS && process.env.IMAPTLS.toLowerCase() == "true" ? true : false,
     authTimeout: 3000
