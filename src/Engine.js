@@ -211,10 +211,10 @@ class Engine {
       args.push(`--proxy-server=${proxy.server}`)
     }
     if (docker) {
-      args.push('--no-sandbox', '--headless', '--disable-dev-shm-usage')
-    } else {
-      args.push('--no-sandbox')
-    }
+      args.push('--no-sandbox', '--headless', '--disable-dev-shm-usage', '--incognito')
+    } /*  else {
+      args.push('--no-sandbox', '--incognito')
+    } */
 
     if (remoteAddress === "") {
       const browser = await puppeteer.launch({ 

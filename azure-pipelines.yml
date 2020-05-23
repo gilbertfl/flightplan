@@ -133,10 +133,10 @@ stages:
           # redeploy headless chrome as docker container instance
           Remove-AzContainerGroup -ResourceGroupName $(resourceGroup) -Name $(remoteChromeName)
           $envVars = @{
-            'CONNECTION_TIMEOUT'='1800000';
-            'PREBOOT_CHROME'='true';
-            'KEEP_ALIVE'='true';
-            'CHROME_REFRESH_TIME'='3600000';
+            'CONNECTION_TIMEOUT'='900000';
+            # 'PREBOOT_CHROME'='true';
+            # 'KEEP_ALIVE'='true';
+            'CHROME_REFRESH_TIME'='1800000';
             # 'DEBUG'='browserless/chrome*';
             'DEBUG'='*';
             'ENABLE_CORS'='true'
