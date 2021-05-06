@@ -39,28 +39,31 @@ $ brew install node
 
 #### Ubuntu
 
-1. Make sure `curl` is installed, by opening Terminal and running:
+1. Install nvm, the node version manager:
 
 ```bash
-$ sudo apt install curl
+$ wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
 ```
+Note: check the latest version of nvm at https://github.com/nvm-sh/nvm/blob/master/README.md#installing-and-updating
 
-2. Add the PPA for the latest Node.js release:
+2. Now install Node.js and NPM:
 
 ```bash
-$ curl -sL https://deb.nodesource.com/setup_10.x | sudo bash -
+$ nvm install 16.1
+Now using node v16.1.0 (npm v7.11.2)
+Creating default alias: default -> 16.1 (-> v16.1.0)
 ```
 
-3. Now install Node.js and NPM:
-
-```bash
-$ sudo apt install -y nodejs
-```
-
-4. Finally, install the build tools:
+3. Install the build tools:
 
 ```bash
 $ sudo apt install -y build-essential
+```
+
+4. (optional) Install the yarn package manager 
+
+```bash
+$ npm install --global yarn
 ```
 
 ## Verify Your Setup
@@ -69,10 +72,10 @@ To make sure Node.js and NPM were installed successfully, open up a command line
 
 ```bash
 $ node -v
-v10.12.0
+v16.1.0
 
 $ npm -v
-6.2.0
+7.11.2
 ```
 
 Your versions may be slightly different, just be sure there are no error messages.
